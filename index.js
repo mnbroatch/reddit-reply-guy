@@ -4,8 +4,8 @@ const compareTwoStrings = require('string-similarity').compareTwoStrings
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
 
-const https = require('http-debug').https
-https.debug = 2
+// const https = require('http-debug').https
+// https.debug = 2
 
 const snoowrap = new Snoowrap({
   userAgent: 'reply-guy-bot',
@@ -181,13 +181,6 @@ function createMessage(currentCase, additionalCases) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'nottheonion',
-  'DIY',
-  'mildlyinteresting',
-  'sports',
-  'space',
-  'gadgets',
-  'blog',
   'Documentaries',
   'photoshopbattles',
   'GetMotivated',
@@ -231,6 +224,12 @@ const subreddits = [
   'books',
   'Art',
   'mildlyinfuriating',
+  'nottheonion',
+  'DIY',
+  'mildlyinteresting',
+  'sports',
+  'space',
+  'gadgets',
 ]
 
 let i = 0
