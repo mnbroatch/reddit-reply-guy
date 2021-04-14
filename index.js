@@ -4,6 +4,9 @@ const compareTwoStrings = require('string-similarity').compareTwoStrings
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
 
+const https = require('http-debug').https
+https.debug = 2
+
 const snoowrap = new Snoowrap({
   userAgent: 'reply-guy-bot',
   clientId: process.env.CLIENT_ID,
@@ -13,10 +16,10 @@ const snoowrap = new Snoowrap({
 })
 
 const EXAMPLE_THREAD_ID = 'mnrn3b'
-const MEGATHREAD_ID = 'mnugzl'
+const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
-const INITIAL_POST_LIMIT = 30
-const AUTHOR_POST_LIMIT = 10
+const INITIAL_POST_LIMIT = 25
+const AUTHOR_POST_LIMIT = 25
 
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
@@ -42,8 +45,11 @@ async function run (subreddit) {
         && p.plagiarized.author.name === plagiarismCase.plagiarized.author.name
       }
     )
-    if (additionalCases.length > 1) {
-      return postComment(plagiarismCase, additionalCases[0])
+    if (
+      additionalCases.length > 1
+      && !plagiarismCase.plagiarized.replies.some(reply => reply.author_fullname == BOT_USER_ID)
+  ) {
+      return postComment(plagiarismCase, additionalCases)
     } else {
       console.log('-------')
       console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
@@ -87,7 +93,7 @@ function flattenReplies(comments) {
 function findPlagiarismCases(post) {
   return post.comments.reduce((acc, comment) => {
     const plagiarized = post.comments.find(c =>
-      compareTwoStrings(stripQuote(comment.body), stripQuote(c.body)) > .97
+      isSimilar(comment, c)
         && c.body.length > 20
         && c.created > comment.created
         && c.body !== '[removed]'
@@ -95,8 +101,7 @@ function findPlagiarismCases(post) {
         && c.body !== '[deleted]'
         && c.parent_id !== comment.parent_id
         && c.author_fullname !== comment.author_fullname
-        && !c.replies.some(reply => reply.author_fullname == BOT_USER_ID)
-        && !getAncestorComments(comment, post).some(c => c.body === comment.body)
+        && !isSimilarToAncestor(c, post)
     )
 
     return plagiarized
@@ -105,21 +110,30 @@ function findPlagiarismCases(post) {
   }, [])
 }
 
+function isSimilar(comment1, comment2) {
+  return compareTwoStrings(stripQuote(comment1.body), stripQuote(comment2.body)) > .97
+}
+
 function stripQuote(comment) {
   return comment.split('\n')
     .filter(line => line.trim()[0] !== '>')
     .join('\n')
 }
 
-function getAncestorComments(comment, post) {
-  let comments = []
+// Breaks if we didn't fetch the whole thread from root to comment.
+// Currently if it breaks, we consider it not to match an ancestor.
+function isSimilarToAncestor(comment, post) {
+  const ancestors = []
   let parentId = comment.parent_id 
   while (parentId !== comment.link_id) {
     const parent = post.comments.find(c => c.name === parentId)
-    comments.push(parent)
-    parentId = parent.parent_id
+    if (parent) {
+      ancestors.push(parent)
+      parentId = parent.parent_id
+    } else break
   }
-  return comments
+
+  return ancestors.some(ancestor => isSimilar(comment, ancestor))
 }
 
 async function getPostsWithCommentsByAuthor(author) {
@@ -139,8 +153,8 @@ async function getPostsWithCommentsByAuthor(author) {
   return posts
 }
 
-function postComment(currentCase, additionalCase) {
-  const message = createMessage(currentCase, additionalCase)
+function postComment(currentCase, additionalCases) {
+  const message = createMessage(currentCase, additionalCases)
   console.log('message', message)
   return Promise.all([
     snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
@@ -148,10 +162,10 @@ function postComment(currentCase, additionalCase) {
   ])
 }
 
-function createMessage(currentCase, additionalCase) {
+function createMessage(currentCase, additionalCases) {
   return `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
 
-  It is probably not a coincidence, because this user has done it before with [this](${additionalCase.plagiarized.permalink}) comment that copies [this one](${additionalCase.original.permalink}).
+  It is probably not a coincidence, because this user has done it before with [this](${additionalCases[0].plagiarized.permalink}) comment that copies [this one](${additionalCases[0].original.permalink}).
 
   ^(beep boop, I'm a bot. It is this bot's opinion that) [^(/u/${currentCase.plagiarized.author.name})](https://www.reddit.com/u/${currentCase.plagiarized.author.name}/) ^(should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
   `
@@ -216,6 +230,7 @@ const subreddits = [
   'explainlikeimfive',
   'books',
   'Art',
+  'mildlyinfuriating',
 ]
 
 let i = 0
