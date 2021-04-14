@@ -1,9 +1,8 @@
-// TODO: be safer about potential repetition-as-meme false positives?
 require('dotenv').config()
+const Snoowrap = require('snoowrap')
+const compareTwoStrings = require('string-similarity').compareTwoStrings
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
-
-const Snoowrap = require('snoowrap')
 
 const snoowrap = new Snoowrap({
   userAgent: 'reply-guy-bot',
@@ -17,7 +16,7 @@ const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mnugzl'
 const BOT_USER_ID = 't2_8z58zoqn'
 const INITIAL_POST_LIMIT = 30
-const AUTHOR_POST_LIMIT = 3
+const AUTHOR_POST_LIMIT = 10
 
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
@@ -49,6 +48,7 @@ async function run (subreddit) {
       console.log('-------')
       console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
       console.log(plagiarismCase.plagiarized.body)
+      console.log('additionalCases.length', additionalCases.length)
       console.log('-------')
     }
   })
@@ -63,6 +63,7 @@ function asyncMap(arr, cb) {
   return Promise.all(arr.map(cb))
 }
 
+// TODO: seems like post metadata is lost?
 async function getPostsWithComments(subreddit) {
   return snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
     .map(post => getPostWithComments(post.id).catch(e => console.error(e)))
@@ -85,17 +86,17 @@ function flattenReplies(comments) {
 
 function findPlagiarismCases(post) {
   return post.comments.reduce((acc, comment) => {
-    const plagiarized = post.comments.find(c =>     
-        c.body === comment.body
-        && c.body.length > 12
+    const plagiarized = post.comments.find(c =>
+      compareTwoStrings(stripQuote(comment.body), stripQuote(c.body)) > .97
+        && c.body.length > 20
         && c.created > comment.created
         && c.body !== '[removed]'
         && c.body !== '[deleted]'
         && c.body !== '[deleted]'
-        && c.body !== post.comments.find(comment => comment.name === c.parent_id)?.body
         && c.parent_id !== comment.parent_id
         && c.author_fullname !== comment.author_fullname
         && !c.replies.some(reply => reply.author_fullname == BOT_USER_ID)
+        && !getAncestorComments(comment, post).some(c => c.body === comment.body)
     )
 
     return plagiarized
@@ -104,13 +105,38 @@ function findPlagiarismCases(post) {
   }, [])
 }
 
-async function getPostsWithCommentsByAuthor(author) {
-  try {
-    return await snoowrap.getUser(author.name).getComments({ limit: AUTHOR_POST_LIMIT })
-      .map((comment) => getPostWithComments(comment.link_id))
-  } catch (e) {
-    console.log(`could not find posts for author ${author.name}`)
+function stripQuote(comment) {
+  return comment.split('\n')
+    .filter(line => line.trim()[0] !== '>')
+    .join('\n')
+}
+
+function getAncestorComments(comment, post) {
+  let comments = []
+  let parentId = comment.parent_id 
+  while (parentId !== comment.link_id) {
+    const parent = post.comments.find(c => c.name === parentId)
+    comments.push(parent)
+    parentId = parent.parent_id
   }
+  return comments
+}
+
+async function getPostsWithCommentsByAuthor(author) {
+  let posts = []
+  try {
+    posts = await snoowrap.getUser(author.name).getComments({ limit: AUTHOR_POST_LIMIT })
+      .map((comment) => getPostWithComments(comment.link_id)
+        .then(post =>
+          !post.comments.some(c => c.id === comment.id)
+            ? { ...post, comments: post.comments.concat(comment) }
+            : post
+        )
+      )
+  } catch (e) {
+    console.log(`could not get posts for author ${author.name}`)
+  }
+  return posts
 }
 
 function postComment(currentCase, additionalCase) {
@@ -118,29 +144,50 @@ function postComment(currentCase, additionalCase) {
   console.log('message', message)
   return Promise.all([
     snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
-    // currentCase.plagiarized.reply(message)
+    currentCase.plagiarized.reply(message)
   ])
 }
 
-// function createMessage(currentCase, additionalCase) {
-//   return `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
-
-//   It is probably not a coincidence, because this user has done it before with [this](${additionalCase.plagiarized.permalink}) comment that copies [this one](${additionalCase.original.permalink}).
-
-//   ^(beep boop, I'm a bot. It is this bot's opinion that) [^(/u/${currentCase.plagiarized.author.name})](https://www.reddit.com/u/${currentCase.plagiarized.author.name}/) ^(should be banned for spamming. A human checks in on this bot sometimes.)
-//   `
-// }
-
 function createMessage(currentCase, additionalCase) {
-  return `[This](http://reddit.com${currentCase.plagiarized.permalink}) comment was copied from [this one](http://reddit.com${currentCase.original.permalink}) at the top level of this comment section.
+  return `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
 
-  It is probably not a coincidence, because this user has done it before with [this](http://reddit.com${additionalCase.plagiarized.permalink}) comment that copies [this one](http://reddit.com${additionalCase.original.permalink}).
+  It is probably not a coincidence, because this user has done it before with [this](${additionalCase.plagiarized.permalink}) comment that copies [this one](${additionalCase.original.permalink}).
+
+  ^(beep boop, I'm a bot. It is this bot's opinion that) [^(/u/${currentCase.plagiarized.author.name})](https://www.reddit.com/u/${currentCase.plagiarized.author.name}/) ^(should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
   `
 }
+
+// function createMessage(currentCase, additionalCase) {
+//   return `[This](http://reddit.com${currentCase.plagiarized.permalink}) comment was copied from [this one](http://reddit.com${currentCase.original.permalink}) at the top level of this comment section.
+
+//   It is probably not a coincidence, because this user has done it before with [this](http://reddit.com${additionalCase.plagiarized.permalink}) comment that copies [this one](http://reddit.com${additionalCase.original.permalink}).
+//   `
+// }
 
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
+  'nottheonion',
+  'DIY',
+  'mildlyinteresting',
+  'sports',
+  'space',
+  'gadgets',
+  'blog',
+  'Documentaries',
+  'photoshopbattles',
+  'GetMotivated',
+  'tifu',
+  'UpliftingNews',
+  'listentothis',
+  'television',
+  'dataisbeautiful',
+  'history',
+  'InternetIsBeautiful',
+  'philosophy',
+  'Futurology',
+  'memes',
+  'WritingPrompts',
   'OldSchoolCool',
   'nosleep',
   'personalfinance',
@@ -169,32 +216,12 @@ const subreddits = [
   'explainlikeimfive',
   'books',
   'Art',
-  'nottheonion',
-  'DIY',
-  'mildlyinteresting',
-  'sports',
-  'space',
-  'gadgets',
-  'blog',
-  'Documentaries',
-  'photoshopbattles',
-  'GetMotivated',
-  'tifu',
-  'UpliftingNews',
-  'listentothis',
-  'television',
-  'dataisbeautiful',
-  'history',
-  'InternetIsBeautiful',
-  'philosophy',
-  'Futurology',
-  'memes',
-  'WritingPrompts',
 ]
 
 let i = 0
+
 run(subreddits[0])
 setInterval(async () => {
   i++
   await run(subreddits[i % subreddits.length])
-}, 1000 * 60 * 1)
+}, 1000 * 60 * 2)

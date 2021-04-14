@@ -10,6 +10,10 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
-    "snoowrap": "^1.22.0"
+    "snoowrap": "^1.22.0",
+    "string-similarity": "^4.0.4"
+  },
+  "devDependencies": {
+    "http-debug": "^0.1.2"
   }
 }
