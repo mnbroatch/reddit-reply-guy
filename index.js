@@ -14,7 +14,7 @@ const snoowrap = new Snoowrap({
   username: process.env.REDDIT_USER,
   password: process.env.REDDIT_PASS
 })
-snoowrap.config({ continueAfterRatelimitError: true })
+snoowrap.config({ requestDelay: 50, continueAfterRatelimitError: true })
 
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
@@ -22,7 +22,10 @@ const BOT_USER_ID = 't2_8z58zoqn'
 const INITIAL_POST_LIMIT = 25
 const AUTHOR_POST_LIMIT = 25
 
-const subredditsThatDisallowLinks = ['pcmasterrace']
+const subredditsThatDisallowLinks = [
+  'pcmasterrace',
+  'politics', // disallows /u/username callouts, should handle separately?
+]
 
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
@@ -49,10 +52,19 @@ async function run (subreddit) {
 
     if (
       additionalCases.length > 1
-      && !isAlreadyRespondedTo(plagiarismCase)
+      && !await isAlreadyRespondedTo(plagiarismCase)
     ) {
       try {
-        return await postComment(plagiarismCase, additionalCases)
+        const commentText = createMessage(
+        plagiarismCase,
+        additionalCases,
+        subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.display_name.toLowerCase())
+      )
+        const reportText = createMessage(plagiarismCase, additionalCases)
+        return Promise.all([
+          postComment(plagiarismCase, message),
+          reportComment(plagiarismCase, message)
+        ])
       } catch (e) {
         console.error(`Couldn't post comment: `, e.message)
       }
@@ -64,7 +76,7 @@ async function run (subreddit) {
       console.log('-------')
     }
   })
-    .then(() => console.log('done'))
+    .then(() => console.log('done')) // firing too early
 }
 
 function asyncFlatMap(arr, cb) {
@@ -166,14 +178,22 @@ async function getPostsWithCommentsByAuthor(author) {
   return posts
 }
 
-function postComment(currentCase, additionalCases) {
-  const message = createMessage(currentCase, additionalCases)
+function postComment(plagiarismCase, message) {
+  console.log(`about to post comment to: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
   return Promise.all([
-    currentCase.plagiarized.reply(message),
+    plagiarismCase.plagiarized.reply(message),
     // snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
   ])
     .then(([reply]) => {
       console.log(`posted http://reddit.com${reply.permalink}`)
+    })
+}
+
+function reportComment(plagiarismCase, message) {
+  console.log(`about to report comment: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
+  return plagiarismCase.plagiarized.report(message)
+    .then((reply) => {
+      console.log(`reported comment`)
     })
 }
 
@@ -186,8 +206,8 @@ async function isAlreadyRespondedTo(plagiarismCase) {
   return replies.some(reply => reply.author_fullname === BOT_USER_ID)
 }
 
-function createMessage(currentCase, additionalCases) {
-  return subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.display_name.toLowerCase())
+function createMessage(currentCase, additionalCases, noLinks) {
+  return noLinks
     ? `It looks like this comment was plagiarized from another in this comment section. The rules of this subreddit do not allow me to link to it, but it is not the first time I've seen this user do this.
 
 ^(beep boop, I'm a bot. It is this bot's opinion that the user above should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
@@ -210,28 +230,6 @@ function createMessage(currentCase, additionalCases) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'listentothis',
-  'television',
-  'dataisbeautiful',
-  'history',
-  'InternetIsBeautiful',
-  'philosophy',
-  'Futurology',
-  'WritingPrompts',
-  'OldSchoolCool',
-  'nosleep',
-  'personalfinance',
-  'creepy',
-  'TwoXChromosomes',
-  'funny',
-  'memes',
-  'AskReddit',
-  'gaming',
-  'aww',
-  'Music',
-  'pics',
-  'science',
-  'worldnews',
   'todayilearned',
   'videos',
   'movies',
@@ -260,6 +258,28 @@ const subreddits = [
   'GetMotivated',
   'tifu',
   'UpliftingNews',
+  'listentothis',
+  'television',
+  'dataisbeautiful',
+  'history',
+  'InternetIsBeautiful',
+  'philosophy',
+  'Futurology',
+  'WritingPrompts',
+  'OldSchoolCool',
+  'nosleep',
+  'personalfinance',
+  'creepy',
+  'TwoXChromosomes',
+  'funny',
+  'AskReddit',
+  'gaming',
+  'aww',
+  'Music',
+  'memes',
+  'pics',
+  'science',
+  'worldnews',
 ]
 
 let i = 0
