@@ -22,6 +22,8 @@ const BOT_USER_ID = 't2_8z58zoqn'
 const INITIAL_POST_LIMIT = 25
 const AUTHOR_POST_LIMIT = 25
 
+const subredditsThatDisallowBots = [ 'AskReddit' ]
+
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
   'politics', // disallows /u/username callouts, should handle separately?
@@ -54,20 +56,16 @@ async function run (subreddit) {
       additionalCases.length > 1
       && !await isAlreadyRespondedTo(plagiarismCase)
     ) {
-      try {
-        const commentText = createMessage(
-        plagiarismCase,
-        additionalCases,
-        subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())
-      )
-        const reportText = createMessage(plagiarismCase, additionalCases)
-        return Promise.all([
-          postComment(plagiarismCase, commentText),
-          reportComment(plagiarismCase, reportText)
-        ])
-      } catch (e) {
-        console.error(`Couldn't post comment: `, e.message)
-      }
+      const commentText = createMessage(
+      plagiarismCase,
+      additionalCases,
+      subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())
+    )
+      const reportText = createMessage(plagiarismCase, additionalCases)
+      return Promise.all([
+        postComment(plagiarismCase, commentText),
+        reportComment(plagiarismCase, reportText)
+      ])
     } else if (additionalCases.length < 2) {
       console.log('-------')
       console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
@@ -179,14 +177,13 @@ async function getPostsWithCommentsByAuthor(author) {
 }
 
 function postComment(plagiarismCase, message) {
+  if (!subredditsThatDisallowBots.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())) return Promise.resolve([])
   console.log(`about to post comment to: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
-  return Promise.all([
-    plagiarismCase.plagiarized.reply(message),
-    // snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
-  ])
-    .then(([reply]) => {
+  return plagiarismCase.plagiarized.reply(message)
+    .then((reply) => {
       console.log(`posted http://reddit.com${reply.permalink}`)
     })
+  .catch((e) => { console.error(`Couldn't post comment: `, e.message) })
 }
 
 function reportComment(plagiarismCase, message) {
@@ -195,15 +192,21 @@ function reportComment(plagiarismCase, message) {
     .then((reply) => {
       console.log(`reported comment`)
     })
+  .catch((e) => { console.error(`Couldn't report comment: `, e.message) })
 }
 
 // We may have comments exactly up to the depth of comment,
 // and we need to check the comment's replies for one of ours.
 async function isAlreadyRespondedTo(plagiarismCase) {
-  const replies = plagiarismCase.plagiarized.replies.length
-    ? plagiarismCase.plagiarized.replies
-    : (await plagiarismCase.plagiarized.expandReplies({ depth: 1 })).replies
-  return replies.some(reply => reply.author_fullname === BOT_USER_ID)
+  try {
+    const replies = plagiarismCase.plagiarized.replies.length
+      ? plagiarismCase.plagiarized.replies
+      : (await plagiarismCase.plagiarized.expandReplies({ depth: 1 })).replies
+    return replies.some(reply => reply.author_fullname === BOT_USER_ID)
+  } catch (e) {
+    // If something goes wrong, we shouldn't post.
+    return true
+  }
 }
 
 function createMessage(currentCase, additionalCases, noLinks) {
@@ -271,7 +274,6 @@ const subreddits = [
   'creepy',
   'TwoXChromosomes',
   'funny',
-  'AskReddit',
   'gaming',
   'aww',
   'Music',
@@ -280,6 +282,7 @@ const subreddits = [
   'science',
   'worldnews',
   'todayilearned',
+  'AskReddit',
 ]
 
 let i = 0
