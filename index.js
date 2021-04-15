@@ -177,7 +177,7 @@ async function getPostsWithCommentsByAuthor(author) {
 }
 
 function postComment(plagiarismCase, message) {
-  if (!subredditsThatDisallowBots.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())) return Promise.resolve([])
+  if (subredditsThatDisallowBots.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())) return Promise.resolve([])
   console.log(`about to post comment to: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
   return plagiarismCase.plagiarized.reply(message)
     .then((reply) => {
@@ -233,7 +233,6 @@ function createMessage(currentCase, additionalCases, noLinks) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'videos',
   'movies',
   'news',
   'pcmasterrace',
@@ -283,6 +282,7 @@ const subreddits = [
   'worldnews',
   'todayilearned',
   'AskReddit',
+  'videos',
 ]
 
 let i = 0
