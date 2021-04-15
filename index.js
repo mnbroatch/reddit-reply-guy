@@ -27,12 +27,14 @@ const subredditsThatDisallowLinks = ['pcmasterrace']
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
 
-  // Gets authors of duplicate comments on a post
-  const plagiarists = uniqBy(
-    flatMap(await getPostsWithComments(subreddit), findPlagiarismCases),
-    'plagiarized.author.name'
-  )
-    .map(plagiarismCase => plagiarismCase.plagiarized.author)
+  // // Gets authors of duplicate comments on a post
+  // const plagiarists = uniqBy(
+  //   flatMap(await getPostsWithComments(subreddit), findPlagiarismCases),
+  //   'plagiarized.author.name'
+  // )
+  //   .map(plagiarismCase => plagiarismCase.plagiarized.author)
+
+  const plagiarists = [{ name: 'makdorsen' }]
 
   // then searches each's comment history for more cases of plagiarism 
   const plagiarismCases = uniqBy(
@@ -44,13 +46,13 @@ async function run (subreddit) {
   return asyncMap(plagiarismCases, async plagiarismCase => {
     const additionalCases = plagiarismCases.filter(
       (p) => p.plagiarized.id !== plagiarismCase.plagiarized.id
-        && p.plagiarized.author.name === plagiarismCase.plagiarized.author.name
+      && p.plagiarized.author.name === plagiarismCase.plagiarized.author.name
     )
 
     if (
       additionalCases.length > 1
-      && isAlreadyRespondedTo(plagiarismCase)
-  ) {
+      && !isAlreadyRespondedTo(plagiarismCase)
+    ) {
       try {
         return await postComment(plagiarismCase, additionalCases)
       } catch (e) {
@@ -64,7 +66,7 @@ async function run (subreddit) {
       console.log('-------')
     }
   })
-  .then(() => console.log('done'))
+    .then(() => console.log('done'))
 }
 
 function asyncFlatMap(arr, cb) {
@@ -107,14 +109,14 @@ function findPlagiarismCases(post) {
   return post.comments.reduce((acc, comment) => {
     const plagiarized = post.comments.find(c =>
       isSimilar(comment, c)
-        && c.body.length > 20
-        && c.created > comment.created
-        && c.body !== '[removed]'
-        && c.body !== '[deleted]'
-        && c.body !== '[deleted]'
-        && c.parent_id !== comment.parent_id
-        && c.author_fullname !== comment.author_fullname
-        && !isSimilarToAncestor(c, post)
+      && c.body.length > 20
+      && c.created > comment.created
+      && c.body !== '[removed]'
+      && c.body !== '[deleted]'
+      && c.body !== '[deleted]'
+      && c.parent_id !== comment.parent_id
+      && c.author_fullname !== comment.author_fullname
+      && !isSimilarToAncestor(c, post)
     )
 
     return plagiarized
@@ -156,8 +158,8 @@ async function getPostsWithCommentsByAuthor(author) {
       .map((comment) => getPostWithComments(comment.link_id)
         .then(post =>
           !post.comments.some(c => c.id === comment.id)
-            ? { ...post, comments: post.comments.concat(comment) }
-            : post
+          ? { ...post, comments: post.comments.concat(comment) }
+          : post
         )
       )
   } catch (e) {
@@ -183,20 +185,14 @@ async function isAlreadyRespondedTo(plagiarismCase) {
   const replies = plagiarismCase.plagiarized.replies.length
     ? plagiarismCase.plagiarized.replies
     : (await plagiarismCase.plagiarized.expandReplies({ depth: 1 })).replies
-
-  if (!plagiarismCase.plagiarized.replies.length && replies.length) {
-    const isRepeat = replies.some(reply => reply.author_fullname == BOT_USER_ID)
-    console.log('isRepeat', isRepeat)
-  }
-
-  return !replies.some(reply => reply.author_fullname == BOT_USER_ID)
+  return replies.some(reply => reply.author_fullname === BOT_USER_ID)
 }
 
 function createMessage(currentCase, additionalCases) {
-  return subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.toLowerCase())
+  return subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.display_name.toLowerCase())
     ? `It looks like this comment was plagiarized from another in this comment section. The rules of this subreddit do not allow me to link to it, but it is not the first time I've seen this user do this.
 
-^(beep boop, I'm a bot. It is this bot's opinion that) the user above should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
+^(beep boop, I'm a bot. It is this bot's opinion that the user above should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
   `
     : `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
 
@@ -216,17 +212,6 @@ function createMessage(currentCase, additionalCases) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'videos',
-  'movies',
-  'news',
-  'pcmasterrace',
-  'Showerthoughts',
-  'EarthPorn',
-  'IAmA',
-  'food',
-  'gifs',
-  'askscience',
-  'Jokes',
   'LifeProTips',
   'explainlikeimfive',
   'books',
@@ -266,6 +251,17 @@ const subreddits = [
   'science',
   'worldnews',
   'todayilearned',
+  'videos',
+  'movies',
+  'news',
+  'pcmasterrace',
+  'Showerthoughts',
+  'EarthPorn',
+  'IAmA',
+  'food',
+  'gifs',
+  'askscience',
+  'Jokes',
 ]
 
 let i = 0
@@ -273,5 +269,9 @@ let i = 0
 run(subreddits[0])
 setInterval(async () => {
   i++
-  await run(subreddits[i % subreddits.length])
+  try {
+    await run(subreddits[i % subreddits.length])
+  } catch (e) {
+    console.log(`something went wrong: ${e.message}`)
+  }
 }, 1000 * 60 * 2)
