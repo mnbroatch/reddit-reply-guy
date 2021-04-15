@@ -27,14 +27,12 @@ const subredditsThatDisallowLinks = ['pcmasterrace']
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
 
-  // // Gets authors of duplicate comments on a post
-  // const plagiarists = uniqBy(
-  //   flatMap(await getPostsWithComments(subreddit), findPlagiarismCases),
-  //   'plagiarized.author.name'
-  // )
-  //   .map(plagiarismCase => plagiarismCase.plagiarized.author)
-
-  const plagiarists = [{ name: 'makdorsen' }]
+  // Gets authors of duplicate comments on a post
+  const plagiarists = uniqBy(
+    flatMap(await getPostsWithComments(subreddit), findPlagiarismCases),
+    'plagiarized.author.name'
+  )
+    .map(plagiarismCase => plagiarismCase.plagiarized.author)
 
   // then searches each's comment history for more cases of plagiarism 
   const plagiarismCases = uniqBy(
@@ -212,22 +210,6 @@ function createMessage(currentCase, additionalCases) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'LifeProTips',
-  'explainlikeimfive',
-  'books',
-  'Art',
-  'mildlyinfuriating',
-  'nottheonion',
-  'DIY',
-  'mildlyinteresting',
-  'sports',
-  'space',
-  'gadgets',
-  'Documentaries',
-  'photoshopbattles',
-  'GetMotivated',
-  'tifu',
-  'UpliftingNews',
   'listentothis',
   'television',
   'dataisbeautiful',
@@ -262,6 +244,22 @@ const subreddits = [
   'gifs',
   'askscience',
   'Jokes',
+  'LifeProTips',
+  'explainlikeimfive',
+  'books',
+  'Art',
+  'mildlyinfuriating',
+  'nottheonion',
+  'DIY',
+  'mildlyinteresting',
+  'sports',
+  'space',
+  'gadgets',
+  'Documentaries',
+  'photoshopbattles',
+  'GetMotivated',
+  'tifu',
+  'UpliftingNews',
 ]
 
 let i = 0
