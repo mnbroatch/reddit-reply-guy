@@ -58,12 +58,12 @@ async function run (subreddit) {
         const commentText = createMessage(
         plagiarismCase,
         additionalCases,
-        subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.display_name.toLowerCase())
+        subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())
       )
         const reportText = createMessage(plagiarismCase, additionalCases)
         return Promise.all([
-          postComment(plagiarismCase, message),
-          reportComment(plagiarismCase, message)
+          postComment(plagiarismCase, commentText),
+          reportComment(plagiarismCase, reportText)
         ])
       } catch (e) {
         console.error(`Couldn't post comment: `, e.message)
@@ -230,7 +230,6 @@ function createMessage(currentCase, additionalCases, noLinks) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'todayilearned',
   'videos',
   'movies',
   'news',
@@ -280,6 +279,7 @@ const subreddits = [
   'pics',
   'science',
   'worldnews',
+  'todayilearned',
 ]
 
 let i = 0
