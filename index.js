@@ -14,12 +14,15 @@ const snoowrap = new Snoowrap({
   username: process.env.REDDIT_USER,
   password: process.env.REDDIT_PASS
 })
+snoowrap.config({ continueAfterRatelimitError: true })
 
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
 const INITIAL_POST_LIMIT = 25
 const AUTHOR_POST_LIMIT = 25
+
+const subredditsThatDisallowLinks = ['pcmasterrace']
 
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
@@ -38,19 +41,22 @@ async function run (subreddit) {
   )
 
   // If author is a repeat offender, post a damning comment.
-  return asyncMap(plagiarismCases, plagiarismCase => {
+  return asyncMap(plagiarismCases, async plagiarismCase => {
     const additionalCases = plagiarismCases.filter(
-      (p) => {
-        return p.plagiarized.id !== plagiarismCase.plagiarized.id
+      (p) => p.plagiarized.id !== plagiarismCase.plagiarized.id
         && p.plagiarized.author.name === plagiarismCase.plagiarized.author.name
-      }
     )
+
     if (
       additionalCases.length > 1
-      && !plagiarismCase.plagiarized.replies.some(reply => reply.author_fullname == BOT_USER_ID)
+      && isAlreadyRespondedTo(plagiarismCase)
   ) {
-      return postComment(plagiarismCase, additionalCases)
-    } else {
+      try {
+        return await postComment(plagiarismCase, additionalCases)
+      } catch (e) {
+        console.error(`Couldn't post comment: `, e.message)
+      }
+    } else if (additionalCases.length < 2) {
       console.log('-------')
       console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
       console.log(plagiarismCase.plagiarized.body)
@@ -69,10 +75,17 @@ function asyncMap(arr, cb) {
   return Promise.all(arr.map(cb))
 }
 
-// TODO: seems like post metadata is lost?
+// FIXME: seems like post metadata is lost?
+// Not needed currently but a little dragonsy
 async function getPostsWithComments(subreddit) {
-  return snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
-    .map(post => getPostWithComments(post.id).catch(e => console.error(e)))
+  let posts = []
+  try {
+    posts = await snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
+      .map(post => getPostWithComments(post.id))
+  } catch (e) {
+    console.log(`Could not get posts from ${subreddit}: `, e.message)
+  }
+  return posts
 }
 
 async function getPostWithComments (postId) {
@@ -155,15 +168,37 @@ async function getPostsWithCommentsByAuthor(author) {
 
 function postComment(currentCase, additionalCases) {
   const message = createMessage(currentCase, additionalCases)
-  console.log('message', message)
   return Promise.all([
-    snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
-    currentCase.plagiarized.reply(message)
+    currentCase.plagiarized.reply(message),
+    // snoowrap.getSubmission(MEGATHREAD_ID).reply(message),
   ])
+    .then(([reply]) => {
+      console.log(`posted http://reddit.com${reply.permalink}`)
+    })
+}
+
+// We may have comments exactly up to the depth of comment,
+// and we need to check the comment's replies for one of ours.
+async function isAlreadyRespondedTo(plagiarismCase) {
+  const replies = plagiarismCase.plagiarized.replies.length
+    ? plagiarismCase.plagiarized.replies
+    : (await plagiarismCase.plagiarized.expandReplies({ depth: 1 })).replies
+
+  if (!plagiarismCase.plagiarized.replies.length && replies.length) {
+    const isRepeat = replies.some(reply => reply.author_fullname == BOT_USER_ID)
+    console.log('isRepeat', isRepeat)
+  }
+
+  return !replies.some(reply => reply.author_fullname == BOT_USER_ID)
 }
 
 function createMessage(currentCase, additionalCases) {
-  return `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
+  return subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === currentCase.original.subreddit.toLowerCase())
+    ? `It looks like this comment was plagiarized from another in this comment section. The rules of this subreddit do not allow me to link to it, but it is not the first time I've seen this user do this.
+
+^(beep boop, I'm a bot. It is this bot's opinion that) the user above should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
+  `
+    : `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
 
   It is probably not a coincidence, because this user has done it before with [this](${additionalCases[0].plagiarized.permalink}) comment that copies [this one](${additionalCases[0].original.permalink}).
 
@@ -181,37 +216,10 @@ function createMessage(currentCase, additionalCases) {
 // const subreddits = ['u_reply-guy-bot']
 
 const subreddits = [
-  'Documentaries',
-  'photoshopbattles',
-  'GetMotivated',
-  'tifu',
-  'UpliftingNews',
-  'listentothis',
-  'television',
-  'dataisbeautiful',
-  'history',
-  'InternetIsBeautiful',
-  'philosophy',
-  'Futurology',
-  'memes',
-  'WritingPrompts',
-  'OldSchoolCool',
-  'nosleep',
-  'personalfinance',
-  'creepy',
-  'TwoXChromosomes',
-  'funny',
-  'AskReddit',
-  'gaming',
-  'aww',
-  'Music',
-  'pics',
-  'science',
-  'worldnews',
-  'todayilearned',
   'videos',
   'movies',
   'news',
+  'pcmasterrace',
   'Showerthoughts',
   'EarthPorn',
   'IAmA',
@@ -230,6 +238,34 @@ const subreddits = [
   'sports',
   'space',
   'gadgets',
+  'Documentaries',
+  'photoshopbattles',
+  'GetMotivated',
+  'tifu',
+  'UpliftingNews',
+  'listentothis',
+  'television',
+  'dataisbeautiful',
+  'history',
+  'InternetIsBeautiful',
+  'philosophy',
+  'Futurology',
+  'WritingPrompts',
+  'OldSchoolCool',
+  'nosleep',
+  'personalfinance',
+  'creepy',
+  'TwoXChromosomes',
+  'funny',
+  'memes',
+  'AskReddit',
+  'gaming',
+  'aww',
+  'Music',
+  'pics',
+  'science',
+  'worldnews',
+  'todayilearned',
 ]
 
 let i = 0
