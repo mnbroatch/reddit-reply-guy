@@ -1,8 +1,9 @@
 require('dotenv').config()
 const Snoowrap = require('snoowrap')
-const compareTwoStrings = require('string-similarity').compareTwoStrings
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
+const findPlagiarismCases = require('./find-plagiarism-cases')
+const createCommentText = require('./create-comment-text')
 
 // const https = require('http-debug').https
 // https.debug = 2
@@ -19,10 +20,11 @@ snoowrap.config({ requestDelay: 50, continueAfterRatelimitError: true })
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
-const INITIAL_POST_LIMIT = 25
-const AUTHOR_POST_LIMIT = 35
+const INITIAL_POST_LIMIT = 15
+const AUTHOR_POST_LIMIT = 20
 
 const subredditsThatDisallowBots = [
+  'memes',
   'AskReddit',
   'SteamGameSwap',
   'SteamTradingCards',
@@ -35,33 +37,95 @@ const subredditsThatDisallowBots = [
   'Steamworks',
   'FlairLinkerEnhanced',
   'RUGCTrade',
-  'memes',
 ]
 
-// Some posts simply won't return reply-guy-bot comments for seemingly no reason.
-// If dupes are noticed they should go here -_-
-// FIXME (??????)
-const fuckedCommentIds = [ 'gulbtx1' ]
-
-const subredditsThatDisallowLinks = [
-  'pcmasterrace',
-  'politics', // disallows /u/username callouts, should handle separately?
-]
+// Some posts simply won't return /u/reply-guy-bot comments for seemingly no reason.
+// If dupes are noticed they should go here -_- FIXME??????
+const fubarCommentIds = [ 'gulbtx1' ]
 
 async function run (subreddit) {
   console.log(`searching in /r/${subreddit}`)
 
-  // Gets authors of duplicate comments on a post
-  const plagiarists = uniqBy(
-    flatMap(await getPostsWithComments(subreddit), findPlagiarismCases),
-    'plagiarized.author.name'
-  )
-    .filter(plagiarismCase => plagiarismCase.plagiarized.author.name !== '[deleted]')
-    .map(plagiarismCase => plagiarismCase.plagiarized.author.name)
+  // // Gets authors of duplicate comments on a post
+  // const plagiarists = uniqBy(
+  //   flatMap(await getPostsWithComments(subreddit), post => findPlagiarismCases(post, false)),
+  //   'plagiarized.author.name'
+  // )
+  //   .filter(plagiarismCase => plagiarismCase.plagiarized.author.name !== '[deleted]')
+  //   .map(plagiarismCase => plagiarismCase.plagiarized.author.name)
+  // console.log('plagiarists', plagiarists)
 
-  // then searches each's comment history for more cases of plagiarism 
+  const plagiarists = [
+    'larboard_dango',
+    'toastandbananas7',
+    'SocrapticMethod',
+    'xmagusx',
+    'LilyRoseMiles',
+    'BandicootUpbeat7639',
+    'WesternTea1477',
+    // 'Leena_Noor0',
+    // 'rilesanders',
+    // 'QuarantineSucksALot',
+    // 'SnooCrickets3586',
+    // 'nexxyPlayz',
+    // 'Doopadaptap',
+    // 'mug_costanza7',
+    // 'Maaysa_Naayla',
+    // 'ImAnIndoorCat',
+    // 'learnsamsung',
+    // 'Vexgullible',
+    // 'mncm10',
+    // 'sir-jwack',
+    // 'EasyReporter5108',
+    // 'bojo1313',
+    // 'manda_roo89',
+    // 'burnisrtyty5465',
+    // 'OutrageousTemporary1',
+    // 'Morons_comment',
+    // 'Deraj2004',
+    // '40ozSmasher',
+    // 'EEEpic_',
+    // '_xXmyusernameXx_',
+    // 'MagisterHistoriae',
+    // 'Savings_Coach',
+    // 'BadGuyBob343',
+    // 'RedditTreasures',
+    // 'TheDaileyGamer',
+    // 'CircumsizedMushroom',
+    // 'cantronite',
+    // 'Rollsage',
+    // 'NeonBladeAce',
+    // 'bamwoof',
+    // 'debtmen',
+    // 'OkPhilosopher13',
+    // 'Savings_Coach',
+    // 'The-Man-Of-Glass',
+    // 'reviewhardly',
+    // 'Rollsage',
+    // 'kristiansands',
+    // 'pro_procrastinator23',
+    // 'Kidbluee',
+    // 'nsgiad',
+    // 'jmay_young',
+    // 'mwestadt',
+    // 'Maaysa_Naayla',
+    // 'SirDextrose',
+    // 'eversaur',
+    // 'asy_ing944',
+    // 'GeorgePierce22',
+    // 'greetjack',
+    // 'IdeBASto',
+    // 'Embermaul',
+    // 'nightguys',
+    // 'llqqvvnnggreeeaajjk',
+    // 'AppropriateExam8',
+    // 'themidnightgod',
+    // 'RoscoMan1',
+  ]
+
+  // then searches each's comment history for more cases of plagiarism ,
   const plagiarismCases = uniqBy(
-    flatMap(await asyncFlatMap(plagiarists, getPostsWithCommentsByAuthor), findPlagiarismCases),
+    flatMap(await asyncFlatMap(plagiarists, getPostsWithCommentsByAuthor), (post) => findPlagiarismCases(post, false)),
     'plagiarized.id'
   )
 
@@ -74,30 +138,35 @@ async function run (subreddit) {
 
     if (
       additionalCases.length > 1
-      && !fuckedCommentIds.some((commentId) => plagiarismCase.plagiarized.id === commentId)
-      && !await isAlreadyRespondedTo(plagiarismCase)
+        && !fubarCommentIds.some((commentId) => plagiarismCase.plagiarized.id === commentId)
+        && !await isAlreadyRespondedTo(plagiarismCase)
+        && plagiarismCase.plagiarized.created > Date.now() / 1000 - 60 * 60 * 24 * 3
     ) {
-      const commentMessage = createCommentMessage(
+      const replyText = createCommentText(
         plagiarismCase,
         additionalCases,
-        subredditsThatDisallowLinks.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())
       )
-      const reportMessage = createReportMessage(plagiarismCase, additionalCases)
+      const reportText = createCommentText(
+        plagiarismCase,
+        additionalCases,
+        true
+      )
       return Promise.all([
-        postComment(plagiarismCase, commentMessage),
-        reportComment(plagiarismCase, reportMessage)
+        postComment(plagiarismCase, replyText),
+        reportComment(plagiarismCase, reportText)
       ])
+        .then(([postedComment]) => {
+          console.log('=======')
+          console.log(`http://reddit.com/u/${plagiarismCase.plagiarized.author.name}`)
+          console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
+          console.log('=======')
+        })
     } else if (additionalCases.length < 2) {
-      console.log('-------')
       console.log(plagiarismCase.plagiarized.author.name)
-      console.log(plagiarismCase.plagiarized.author_fullname)
-      console.log(`http://reddit.com${plagiarismCase.plagiarized.permalink}`)
-      console.log(plagiarismCase.plagiarized.body)
-      console.log('additionalCases.length', additionalCases.length)
-      console.log('-------')
     }
   })
-    .then(() => console.log('done')) // firing too early
+    .then(() => console.log('done'))
+    .catch((e) => console.error(e))
 }
 
 function asyncFlatMap(arr, cb) {
@@ -136,52 +205,6 @@ function flattenReplies(comments) {
   }, [])
 }
 
-function findPlagiarismCases(post) {
-  return post.comments.reduce((acc, comment) => {
-    const plagiarized = post.comments.find(c =>
-      isSimilar(comment, c)
-      && c.body.length > 20
-      && c.created > comment.created
-      && c.body !== '[removed]'
-      && c.body !== '[deleted]'
-      && c.body !== '[deleted]'
-      && c.parent_id !== comment.parent_id
-      && c.author_fullname !== comment.author_fullname
-      && !isSimilarToAncestor(c, post)
-    )
-
-    return plagiarized
-      ? [ ...acc, { original: comment, plagiarized } ]
-      : acc
-  }, [])
-}
-
-function isSimilar(comment1, comment2) {
-  return compareTwoStrings(stripQuote(comment1.body), stripQuote(comment2.body)) > .97
-}
-
-function stripQuote(comment) {
-  return comment.split('\n')
-    .filter(line => line.trim()[0] !== '>')
-    .join('\n')
-}
-
-// Breaks if we didn't fetch the whole thread from root to comment.
-// Currently if it breaks, we consider it not to match an ancestor.
-function isSimilarToAncestor(comment, post) {
-  const ancestors = []
-  let parentId = comment.parent_id 
-  while (parentId !== comment.link_id) {
-    const parent = post.comments.find(c => c.name === parentId)
-    if (parent) {
-      ancestors.push(parent)
-      parentId = parent.parent_id
-    } else break
-  }
-
-  return ancestors.some(ancestor => isSimilar(comment, ancestor))
-}
-
 async function getPostsWithCommentsByAuthor(authorName) {
   let posts = []
   try {
@@ -200,21 +223,19 @@ async function getPostsWithCommentsByAuthor(authorName) {
 }
 
 function postComment(plagiarismCase, message) {
-  if (subredditsThatDisallowBots.find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())) return Promise.resolve([])
-
-  return plagiarismCase.plagiarized.reply(message)
-    .then((reply) => {
-      console.log(`posted http://reddit.com${reply.permalink} to http://reddit.com${plagiarismCase.plagiarized.permalink}`)
+  return subredditsThatDisallowBots
+    .find(subreddit => subreddit.toLowerCase() === plagiarismCase.original.subreddit.display_name.toLowerCase())
+  ? null
+  : plagiarismCase.plagiarized.reply(message)
+    .catch((e) => {
+      console.error(`Couldn't post comment: `, e.message)
+      console.log('plagiarismCase.plagiarized', plagiarismCase.plagiarized)
     })
-  .catch((e) => { console.error(`Couldn't post comment: `, e.message) })
 }
 
 function reportComment(plagiarismCase, message) {
   return plagiarismCase.plagiarized.report(message)
-    .then((reply) => {
-      console.log(`reported comment: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
-    })
-  .catch((e) => { console.error(`Couldn't report comment: `, e.message) })
+    .catch((e) => { console.error(`Couldn't report comment: `, e.message) })
 }
 
 // We may have comments exactly up to the depth of comment,
@@ -227,61 +248,13 @@ async function isAlreadyRespondedTo(plagiarismCase) {
 
     return replies.some(reply => reply.author_fullname === BOT_USER_ID)
   } catch (e) {
+    console.error(`weird iterable error: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
     // If something goes wrong with this, we shouldn't post.
-    console.error('e', e)
     return true
   }
 }
 
-function createReportMessage(currentCase, additionalCases) {
-  let message = `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
-
-More instances of plagiarism by /u/${currentCase.plagiarized.author.name}:
-
-Original | Plagiarized
--------- | -----------`
-
-  additionalCases.forEach((plagiarismCase) => {
-    message += `
-${plagiarismCase.original.permalink} | ${plagiarismCase.plagiarized.permalink}`
-  })
-
-  message += `
-
-beep boop, I'm a bot >:] Contact /u/reply-guy-bot if you have concerns.`
-
-  return message
-}
-
-function createCommentMessage(currentCase, additionalCases, noLinks) {
-  return noLinks
-    ? `It looks like this comment was plagiarized from another in this comment section. The rules of this subreddit do not allow me to link to it, but it is not the first time I've seen this user do this.
-
-^(beep boop, I'm a bot. It is this bot's opinion that the user above should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
-  `
-    : `This comment was copied from [this one](${currentCase.original.permalink}) elsewhere in this comment section.
-
-  It is probably not a coincidence, because this user has done it before with [this](${additionalCases[0].plagiarized.permalink}) comment that copies [this one](${additionalCases[0].original.permalink}).
-
-  ^(beep boop, I'm a bot. It is this bot's opinion that) [^(/u/${currentCase.plagiarized.author.name})](https://www.reddit.com/u/${currentCase.plagiarized.author.name}/) ^(should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake.)
-  `
-}
-
 const subreddits = [
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'explainlikeimfive',
-  'worldnews',
-  'memes',
-  'funny',
-  'aww',
-  'gaming',
-  'food',
-  'todayilearned',
-  'OutOfTheLoop',
-  'BrandNewSentence',
-  'madlads',
   'tifu',
   'nextfuckinglevel',
   'gardening',
@@ -291,20 +264,40 @@ const subreddits = [
   'Tinder',
   'news',
   'cats',
+  'dogs',
+  'Music',
   'Genshin_Impact',
   'movies',
+  'Art',
+  'blog',
+  'nottheonion',
   'pcmasterrace',
   'videos',
   'AskReddit',
+  'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'explainlikeimfive',
+  'worldnews',
+  'funny',
+  'aww',
+  'gaming',
+  'food',
+  'todayilearned',
+  'OutOfTheLoop',
+  'BrandNewSentence',
+  'madlads',
 ]
 
 let i = 0
 run(subreddits[0])
-setInterval(async () => {
-  i++
-  try {
-    await run(subreddits[i % subreddits.length])
-  } catch (e) {
-    console.log(`something went wrong: ${e.message}`)
-  }
-}, 1000 * 60 * 2)
+// setInterval(async () => {
+//   i++
+//   try {
+//     await run(subreddits[i % subreddits.length])
+//   } catch (e) {
+//     console.log(`something went wrong: ${e.message}`)
+//   }
+// }, 1000 * 60 * 3)
+
+// module.exports = run
