@@ -21,6 +21,10 @@ function createCommentText (
     ? 'another'
     : `[this one](${plagiarismCase.original.permalink})`
 
+  const plagiarized = isReport
+    ? `[This comment](${plagiarismCase.plagiarized.permalink})`
+    : 'This comment'
+
   return `This comment was copied from ${original} elsewhere in this comment section.`
     + (noLinks
       ? ' The rules of this subreddit do not allow me to link to it.'

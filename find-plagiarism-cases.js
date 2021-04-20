@@ -1,5 +1,12 @@
 const compareTwoStrings = require('string-similarity').compareTwoStrings
 
+const whitelist = [
+  'SaveVideo',
+  'savevideobot',
+  '[deleted]',
+]
+
+
 const criteria = [
   {
     description: 'Are these comments similar?',
@@ -17,9 +24,14 @@ const criteria = [
       && maybePlagiarized.body !== '[deleted]'
   },
   {
+    description: 'Is author not whitelisted?',
+    test: (original, maybePlagiarized) =>
+      !whitelist.includes(maybePlagiarized.author.name),
+  },
+  {
     description: 'Is body long enough?',
     test: (original, maybePlagiarized) =>
-      maybePlagiarized.body.length > 15,
+      stripQuote(maybePlagiarized.body).length > 15,
   },
   {
     description: 'Do non-root comments have different parents?',
@@ -66,7 +78,6 @@ function isSimilarToAncestor(comment, post) {
 }
 
 function findPlagiarismCases(post, verbose) {
-  
   return post.comments.reduce((acc, comment) => {
     const plagiarized = post.comments.find(c =>
       criteria.every((criterion, i) => {
