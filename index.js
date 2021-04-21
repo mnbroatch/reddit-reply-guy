@@ -59,50 +59,14 @@ const subredditsThatDisallowBots = [
 // If duplicate bot replies are noticed, comment should go here -_-
 const fubarCommentIds = []
 
-async function run (subreddit) {
-  console.log(`searching in /r/${subreddit}`)
+async function run ({ subreddit, authors }) {
+  if (subreddit) {
+    console.log(`searching in /r/${subreddit}`)
+  } else {
+    console.log(`searching ${authors?.length || 0} authors`)
+  }
 
-  const plagiarists = await getPlagiaristsFromPosts(await getPostsWithComments(subreddit))
-
-  // const plagiarists = Array.from(new Set([
-  //   'Good_Independent_596',
-  //   'Beneficial_Road1050',
-  //   'OrgalorgLives',
-  //   'ZetikaGaming',
-  //   'Powerful-Restaurant5',
-  //   'AlertedCoyote',
-  //   'IChirpI',
-  //   'jenggodzilla',
-  //   'DominickLemos89',
-  //   'WayneKennedy75',
-  //   'stabilityinfinity',
-  //   'variableHockey',
-  //   '_ThatOneLurker_',
-  //   'NothingDoing1967',
-  //   // 'BrokenCog2020',
-  //   // 'jigsawertret34534',
-  //   // 'BigLock637',
-  //   // 'yzheqqweqwe21321',
-  //   // 'AcidSecs',
-  //   // 'Sosumi_rogue',
-  //   // 'VacationNo9451',
-  //   // 'MuchBar1571',
-  //   // 'RainGreedy3880',
-  //   // 'MarionberryDry9211',
-  //   // 'CapablePerspective53',
-  //   // 'ConsiderationNo1351',
-  //   // 'hillsons',
-  //   // 'Dustin_Bromain',
-  //   // 'lupul28',
-  //   // 'big-loose-bruce',
-  //   // 'returnonyolo',
-  //   // 'PerformanceDouble957',
-  //   // 'Z_El',
-  //   // 'Intelligent-Stock912',
-  //   // 'SensitiveScreenSos',
-  //   // 'poppa_koils',
-  // ]))
-
+  const plagiarists = authors || await getPlagiaristsFromPosts(await getPostsWithComments(subreddit))
   const plagiarismCases = await getPlagiarismCasesFromAuthors(plagiarists)
 
   // If author is a repeat offender, post a damning comment.
@@ -131,17 +95,14 @@ async function run (subreddit) {
 async function getPlagiarismCasesFromAuthors(plagiarists) {
   return uniqBy(
     flatMap(
-      await asyncFlatMap(
+      (await asyncMap(
         plagiarists,
         getPostsWithCommentsByAuthor
-      ), (post) => findPlagiarismCases(post, false)
+      )).flat(),
+      (post) => findPlagiarismCases(post, false)
     ),
     'plagiarized.id'
   )
-}
-
-function asyncFlatMap(arr, cb) {
-  return Promise.all(arr.map(cb)).then(resolved => resolved.flat())
 }
 
 function asyncMap(arr, cb) {
@@ -166,7 +127,6 @@ async function getPostsWithComments(subreddit) {
   let posts = []
   try {
     posts = await snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
-    // posts = await snoowrap.getHot({limit: INITIAL_POST_LIMIT})
       .map(post => getPostWithComments(post.id))
   } catch (e) {
     console.log(`Could not get posts from ${subreddit}: `, e.message)
@@ -215,7 +175,7 @@ function postReply(comment, message) {
 }
 
 function reportComment(comment, message) {
-  return comment.report(`reply-guy`)
+  return comment.report({ reason: message })
     .catch((e) => { console.error(`Couldn't report comment: `, e.message) })
 }
 
@@ -237,12 +197,11 @@ async function processPlagiarismCase (plagiarismCase, additionalCases) {
 
     return Promise.all([
       postReply(plagiarismCase.plagiarized, replyText),
-      reportComment(plagiarismCase.plagiarized, reportText)
+      reportComment(plagiarismCase.plagiarized, reportText),
     ])
       .then(async ([postedComment]) => new Promise((resolve, reject) => {
         // wait 10 seconds and see if our comments are included.
         if (postedComment) {
-          console.log('456', 456)
           setTimeout(async () => {
             let alreadyResponded
             try {
@@ -251,6 +210,7 @@ async function processPlagiarismCase (plagiarismCase, additionalCases) {
               console.log('e', e)
               alreadyResponded = false
             }
+
             if (alreadyResponded) {
               console.log('=======')
               console.log(`success: http://reddit.com${postedComment.permalink}`)
@@ -260,6 +220,8 @@ async function processPlagiarismCase (plagiarismCase, additionalCases) {
             }
             resolve(plagiarismCase)
           }, 1000 * 30)
+        } else {
+          resolve(plagiarismCase)
         }
       }))
   }
@@ -330,16 +292,26 @@ function isCommentTooOld({ created }) {
   return created < Date.now() / 1000 - 60 * 60 * 24 * 3
 }
 
+async function asyncMapSerial(arr, cb) {
+  const responses = []
+  const arrCopy = [ ...arr ]
+  while (arr.length) {
+    responses.push(await cb(arr.shift()))
+  }
+  return responses
+}
+
+function populateQueue(subreddits) {
+  return subreddits.map(subreddit => () => run(subreddit))
+}
+
 const subreddits = [
-  'blog',
-  'books',
-  'europe',
+  'AskReddit',
   'nottheonion',
   'IAmA',
   'pcmasterrace',
   'Superstonk',
   'videos',
-  'AskReddit',
   'AnimalsBeingBros',
   'funnyvideos',
   'mildlyinteresting',
@@ -374,6 +346,7 @@ const subreddits = [
   'interestingasfuck',
   'relationships',
   'politics',
+  'all',
   'instant_regret',
   'leagueoflegends',
   'Tinder',
@@ -383,34 +356,25 @@ const subreddits = [
   'Genshin_Impact',
   'movies',
   'Art',
+  'blog',
+  'europe',
+  'books',
 ]
 
-// // For human investigation
-// async function getAuthorReport(plagiarist) {
-//   const [first, ...rest] = (await getPlagiarismCasesFromAuthors([plagiarist]))
-//     .filter((plagiarismCase) => plagiarismCase.plagiarized.author.name === plagiarist)
-//   console.log(createCommentText(first, rest, true))
-// }
-// getAuthorReport('BraveDelay8869')
-
 ;(async function () {
-  let i = 0
-  const additionalAuthorsToInvestigate = new Set((await run(subreddits[0])))
-  setInterval(async () => {
-    i++
+  while (true) {
     try {
-      const moreToInvestigate = await run(subreddits[i % subreddits.length])
-      moreToInvestigate.forEach((author) => {
-        additionalAuthorsToInvestigate.add(author)
-      })
-      // until an automated strategy is implemented, just log all of them cumulatively
-      // for a human to look at later
-      console.log('additional authors:')
-      for (let author of additionalAuthorsToInvestigate) console.log(`'${author}',`)
+      const authors = (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat()
+      console.log('authors', authors)
+      await run({ authors })
     } catch (e) {
-      console.log(`something went wrong: ${e.message}`)
+      console.error(`something went wrong: ${e.message}`)
     }
-  }, 1000 * 60 * 3)
+  }
+})()
+
+;(function wait () {
+   setTimeout(wait, 1000);
 })()
 
 module.exports = run
