@@ -25,13 +25,17 @@ function createCommentText (
     ? `[This comment](${plagiarismCase.plagiarized.permalink})`
     : 'This comment'
 
+  const additional = noLinks
+    ? '.'
+   : ` with [this](${additionalCases[0].plagiarized.permalink}) comment which copies [this one](${additionalCases[0].original.permalink})`
+
   return `This comment was copied from ${original} elsewhere in this comment section.`
     + (noLinks
       ? ' The rules of this subreddit do not allow me to link to it.'
       : '')
     + (isReport
       ? `\n\nMore instances of plagiarism by /u/${plagiarismCase.plagiarized.author.name}:\n\n${createTable(additionalCases)}`
-      : `\n\nIt is probably not a coincidence, because this user has done it before with [this](${additionalCases[0].plagiarized.permalink}) comment which copies [this one](${additionalCases[0].original.permalink}).`)
+      : `\n\nIt is probably not a coincidence, because this user has done it before${additional}`)
     + "\n\nbeep boop, I'm a bot >:] It is this bot's opinion that"
     + (noUsernameLinks
       ? ' the user above'

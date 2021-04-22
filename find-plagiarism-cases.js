@@ -1,11 +1,15 @@
 const compareTwoStrings = require('string-similarity').compareTwoStrings
 
-const whitelist = [
+const authorWhitelist = [
   'SaveVideo',
   'savevideobot',
+  'AmericanDreamDR',
   '[deleted]',
 ]
 
+const bodyWhitelist = [
+  'sorry for your loss',
+]
 
 const criteria = [
   {
@@ -26,7 +30,16 @@ const criteria = [
   {
     description: 'Is author not whitelisted?',
     test: (original, maybePlagiarized) =>
-      !whitelist.includes(maybePlagiarized.author.name),
+      !authorWhitelist.includes(maybePlagiarized.author.name),
+  },
+  {
+    description: 'Is body not whitelisted?',
+    test: (original, maybePlagiarized) =>
+      !bodyWhitelist.some((body) =>
+        maybePlagiarized.body.toLowerCase()
+          .includes(body.toLowerCase())
+        && maybePlagiarized.body.length < body.length * 2
+      ),
   },
   {
     description: 'Is body long enough?',

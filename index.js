@@ -2,6 +2,7 @@ require('dotenv').config()
 const Snoowrap = require('snoowrap')
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
+const chunk = require('lodash/chunk')
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 const findPlagiarismCases = require('./find-plagiarism-cases')
@@ -364,17 +365,15 @@ const subreddits = [
 ;(async function () {
   while (true) {
     try {
-      const authors = (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat()
-      console.log('authors', authors)
-      await run({ authors })
+      const authors = uniqBy(
+        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+      )
+      const authorChunks = chunk(authors, 5)
+      await asyncMapSerial(authorChunks, (authorChunk) => run({ authors: authorChunk }))
     } catch (e) {
       console.error(`something went wrong: ${e.message}`)
     }
   }
-})()
-
-;(function wait () {
-   setTimeout(wait, 1000);
 })()
 
 module.exports = run
