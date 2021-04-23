@@ -296,8 +296,8 @@ function isCommentTooOld({ created }) {
 async function asyncMapSerial(arr, cb) {
   const responses = []
   const arrCopy = [ ...arr ]
-  while (arr.length) {
-    responses.push(await cb(arr.shift()))
+  while (arrCopy.length) {
+    responses.push(await cb(arrCopy.shift()))
   }
   return responses
 }

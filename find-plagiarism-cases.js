@@ -11,6 +11,10 @@ const bodyWhitelist = [
   'sorry for your loss',
 ]
 
+const subredditWhitelist = [
+  'FreeKarma4U',
+]
+
 const criteria = [
   {
     description: 'Are these comments similar?',
@@ -26,6 +30,11 @@ const criteria = [
     test: (original, maybePlagiarized) => 
       maybePlagiarized.body !== '[removed]'
       && maybePlagiarized.body !== '[deleted]'
+  },
+  {
+    description: 'Is subreddit not whitelisted?',
+    test: (original, maybePlagiarized) =>
+      !subredditWhitelist.includes(maybePlagiarized.subreddit),
   },
   {
     description: 'Is author not whitelisted?',
