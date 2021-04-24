@@ -3,22 +3,20 @@ const compareTwoStrings = require('string-similarity').compareTwoStrings
 const authorWhitelist = [
   'SaveVideo',
   'savevideobot',
-  'AmericanDreamDR',
+  'Quoterm',
   '[deleted]',
-]
-
-const bodyWhitelist = [
-  'sorry for your loss',
 ]
 
 const subredditWhitelist = [
   'FreeKarma4U',
+  'SuperStonk',
 ]
 
 const criteria = [
   {
     description: 'Are these comments similar?',
-    test: isSimilar
+    test: (original, maybePlagiarized) =>
+      isSimilar(original.body, maybePlagiarized.body)
   },
   {
     description: 'Was original comment created first?',
@@ -32,6 +30,27 @@ const criteria = [
       && maybePlagiarized.body !== '[deleted]'
   },
   {
+    description: 'Is body long enough?',
+    test: (original, maybePlagiarized) =>
+      stripQuote(maybePlagiarized.body).length > 15,
+  },
+  {
+    description: 'Is author copying someone else?',
+    test: (original, maybePlagiarized) => 
+      original.author_fullname !== maybePlagiarized.author_fullname 
+  },
+  {
+    description: 'Do non-root comments have different parents?',
+    test: (original, maybePlagiarized) => 
+      original.parent_id === original.link_id
+      || original.parent_id !== maybePlagiarized.parent_id
+  },
+  {
+    description: 'Is the comment different from ancestors?',
+    test: (original, maybePlagiarized, post) => 
+      !isSimilarToAncestor(maybePlagiarized, post)
+  },
+  {
     description: 'Is subreddit not whitelisted?',
     test: (original, maybePlagiarized) =>
       !subredditWhitelist.includes(maybePlagiarized.subreddit),
@@ -42,40 +61,14 @@ const criteria = [
       !authorWhitelist.includes(maybePlagiarized.author.name),
   },
   {
-    description: 'Is body not whitelisted?',
-    test: (original, maybePlagiarized) =>
-      !bodyWhitelist.some((body) =>
-        maybePlagiarized.body.toLowerCase()
-          .includes(body.toLowerCase())
-        && maybePlagiarized.body.length < body.length * 2
-      ),
-  },
-  {
-    description: 'Is body long enough?',
-    test: (original, maybePlagiarized) =>
-      stripQuote(maybePlagiarized.body).length > 15,
-  },
-  {
-    description: 'Do non-root comments have different parents?',
-    test: (original, maybePlagiarized) => 
-      original.parent_id === original.link_id
-      || original.parent_id !== maybePlagiarized.parent_id
-  },
-  {
-    description: 'Is author copying someone else?',
-    test: (original, maybePlagiarized) => 
-      original.author_fullname !== maybePlagiarized.author_fullname 
-  },
-  {
-    description: 'Is the comment different from ancestors?',
-    test: (original, maybePlagiarized, post) => 
-      !isSimilarToAncestor(maybePlagiarized, post)
+    description: 'Is body not a reddit shorthand link?',
+    test: (original, maybePlagiarized) => {
+      const firstWord = maybePlagiarized.body.split(' ')[0]
+      return maybePlagiarized.body.length < firstWord.length * 2
+        || !/^\/?u\//.test(firstWord) && !/^\/?r\//.test(firstWord) 
+    },
   },
 ]
-
-function isSimilar(comment1, comment2) {
-  return compareTwoStrings(stripQuote(comment1.body), stripQuote(comment2.body)) > .97
-}
 
 function stripQuote(comment) {
   return comment.split('\n')
@@ -96,20 +89,22 @@ function isSimilarToAncestor(comment, post) {
     } else break
   }
 
-  return ancestors.some(ancestor => isSimilar(comment, ancestor))
+  return ancestors.some(ancestor => isSimilar(comment.body, ancestor.body))
 }
 
-function findPlagiarismCases(post, verbose) {
+function findPlagiarismCases(post) {
+  const verbose = process.env.VERBOSE 
   return post.comments.reduce((acc, comment) => {
     const plagiarized = post.comments.find(c =>
       criteria.every((criterion, i) => {
         const doesPass = criterion.test(comment, c, post)
-        if (verbose && !doesPass && i > 2) {
+        if (verbose && !doesPass && i > 4) {
           console.log('~~~~~~~~~~~~~~~')
           console.log(`failed: ${criterion.description}`)
-
+          console.log(`${c.body.slice(0, 50)}${c.body.length > 50 ? '...' : ''}`)
           console.log('c.plagiarized.author.name', c.author.name)
           console.log(`http://reddit.com${c.permalink}`)
+          console.log(`http://reddit.com${comment.permalink}`)
           console.log('~~~~~~~~~~~~~~~')
         }
         return doesPass
@@ -122,4 +117,8 @@ function findPlagiarismCases(post, verbose) {
   }, [])
 }
 
-module.exports = findPlagiarismCases
+module.exports = { isSimilar, findPlagiarismCases }
+
+function isSimilar(str1, str2) {
+  return compareTwoStrings(stripQuote(str1), stripQuote(str2)) > .97
+}
