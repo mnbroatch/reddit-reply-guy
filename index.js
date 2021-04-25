@@ -365,7 +365,7 @@ async function isAuthorTrusted (name) {
 
 function cleanup() {
   return db.get('trustedAuthors')
-    .remove(({trustedAt}) => trustedAt < Date.now() - 1000 * 60 * 60 * 24 * 3)
+    .remove(({trustedAt}) => trustedAt < Date.now() - 1000 * 60 * 60 * 24)
     .write()
 }
 
