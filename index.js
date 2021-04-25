@@ -11,7 +11,6 @@ const createCommentText = require('./create-comment-text')
 const adapter = new FileSync('db/db.json')
 const db = low(adapter)
 
-// TODO: cleanup
 db
   .defaults({
     fubarComments: [],
@@ -372,16 +371,13 @@ async function isAuthorTrusted (name) {
     .value()
 }
 
-async function cleanup() {
+function cleanup() {
   return db.get('trustedAuthors')
     .remove(({trustedAt}) => trustedAt < Date.now() - 1000 * 60 * 60 * 24 * 3)
     .write()
 }
 
 const subreddits = [
-  'fedex',
-  'AskReddit',
-  'nottheonion',
   'IAmA',
   'pcmasterrace',
   'videos',
@@ -432,6 +428,9 @@ const subreddits = [
   'books',
   'all',
   'popular',
+  'fedex',
+  'AskReddit',
+  'nottheonion',
 ]
 
 ;(async function () {

@@ -4,12 +4,13 @@ const authorWhitelist = [
   'SaveVideo',
   'savevideobot',
   'Quoterm',
+  'Lars_porsenna',
   '[deleted]',
 ]
 
 const subredditWhitelist = [
   'FreeKarma4U',
-  'SuperStonk',
+  'Superstonk',
 ]
 
 const criteria = [
@@ -53,7 +54,8 @@ const criteria = [
   {
     description: 'Is subreddit not whitelisted?',
     test: (original, maybePlagiarized) =>
-      !subredditWhitelist.includes(maybePlagiarized.subreddit),
+      !subredditWhitelist
+        .find(subreddit => subreddit.toLowerCase() === maybePlagiarized.subreddit.display_name.toLowerCase())
   },
   {
     description: 'Is author not whitelisted?',
@@ -64,7 +66,7 @@ const criteria = [
     description: 'Is body not a reddit shorthand link?',
     test: (original, maybePlagiarized) => {
       const firstWord = maybePlagiarized.body.split(' ')[0]
-      return maybePlagiarized.body.length < firstWord.length * 2
+      return maybePlagiarized.body.length > firstWord.length * 2
         || !/^\/?u\//.test(firstWord) && !/^\/?r\//.test(firstWord) 
     },
   },
