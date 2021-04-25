@@ -105,7 +105,6 @@ async function run ({
         authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES
           && !isAuthorRepetitive(authorPlagiarismCases)
       ) {
-        console.log('123', 123)
         await asyncMap(
           await asyncFilter(
             authorPlagiarismCases,
@@ -371,22 +370,6 @@ function cleanup() {
 }
 
 const subreddits = [
-  'IAmA',
-  'pcmasterrace',
-  'videos',
-  'AnimalsBeingBros',
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'aww',
   'gaming',
   'food',
   'todayilearned',
@@ -424,6 +407,22 @@ const subreddits = [
   'fedex',
   'AskReddit',
   'nottheonion',
+  'IAmA',
+  'pcmasterrace',
+  'videos',
+  'AnimalsBeingBros',
+  'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'antiMLM',
+  'explainlikeimfive',
+  'StarWars',
+  'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
+  'aww',
 ]
 
 ;(async function () {
