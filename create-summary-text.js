@@ -46,9 +46,10 @@ beep boop, I'm a bot >:] It is this bot's opinion that ${username} should be ban
 function createTable (additionalCases) {
   return `Original | Plagiarized\n-------- | -----------`
     + additionalCases.reduce((acc, plagiarismCase) =>
-        acc + `\n${plagiarismCase.original.permalink} | ${plagiarismCase.plagiarized.permalink}`
+        acc + `\n[${plagiarismCase.original.permalink}](${plagiarismCase.original.permalink}) | [${plagiarismCase.plagiarized.permalink}](${plagiarismCase.plagiarized.permalink})`
       , '')
 }
+
 
 module.exports = {
   createReplyText,
