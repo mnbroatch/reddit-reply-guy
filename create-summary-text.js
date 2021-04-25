@@ -40,7 +40,7 @@ function createReplyText (
 
 It is probably not a coincidence, because this user has done it before${additional}.
 
-beep boop, I'm a bot >:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
+beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
 }
 
 function createTable (additionalCases) {
