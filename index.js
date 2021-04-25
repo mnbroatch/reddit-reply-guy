@@ -6,7 +6,7 @@ const chunk = require('lodash/chunk')
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 const { findPlagiarismCases, isSimilar } = require('./find-plagiarism-cases')
-const createCommentText = require('./create-comment-text')
+const { createReplyText, createReportText } = require('./create-summary-text')
 
 const adapter = new FileSync('db/db.json')
 const db = low(adapter)
@@ -241,18 +241,11 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   return Promise.all([
     postReply(
       plagiarismCase.plagiarized,
-      createCommentText(
-        plagiarismCase,
-        additionalCases,
-      )
+      createReplyText(plagiarismCase, additionalCases)
     ),
     sendReport(
       plagiarismCase.plagiarized,
-      createCommentText(
-        plagiarismCase,
-        additionalCases,
-        true
-      )
+      createReportText(plagiarismCase)
     ),
   ])
     .then(async ([postedComment]) => new Promise((resolve, reject) => {
