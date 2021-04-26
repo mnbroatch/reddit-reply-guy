@@ -101,6 +101,7 @@ function findPlagiarismCases(post) {
       criteria.every((criterion, i) => {
         const doesPass = criterion.test(comment, c, post)
         if (verbose && !doesPass && i > 4) {
+          console.log('verbose', verbose)
           console.log('~~~~~~~~~~~~~~~')
           console.log(`failed: ${criterion.description}`)
           console.log(`${c.body.slice(0, 50)}${c.body.length > 50 ? '...' : ''}`)

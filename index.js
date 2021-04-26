@@ -231,10 +231,10 @@ async function shouldProcessPlagiarismCase (plagiarismCase) {
 
 async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   const additionalCases = authorPlagiarismCases.filter(c => plagiarismCase !== c)
-  const shouldReply = subredditsThatDisallowBots
-    .find(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
+  const shouldReply = !subredditsThatDisallowBots
+    .some(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
 
-  const [ reportResponse, postedComment ] = await Promise.all([
+  await Promise.all([
     sendReport(
       plagiarismCase.plagiarized,
       createReportText(plagiarismCase)
@@ -244,8 +244,6 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
       createReplyText(plagiarismCase, additionalCases)
     ),
   ])
-
-  console.log('reportResponse', reportResponse)
 
   if (shouldReply) {
     // wait some time and see if our comments are included.
@@ -272,7 +270,7 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
       }, 1000 * 30)
     })
   } else {
-    console.log(`not replying to post in ${plagiarized.plagiarized.subreddit.display_name}`)
+    console.log(`not replying to post in ${plagiarismCase.plagiarized.subreddit.display_name}`)
   }
 }
 
