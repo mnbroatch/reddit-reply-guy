@@ -82,25 +82,22 @@ async function run ({
     async author => !await isAuthorTrusted(author)
   )
 
-  const plagiarismCases = uniqBy(
+  const plagiarismCasesByAuthor = uniqBy(
     (await asyncMapSerial(
       chunk(authors, AUTHORS_CHUNK_SIZE),
-      async (authorsChunk) => (await asyncMap(
+      async (authorsChunk) => await asyncMap(
         authorsChunk,
         getPlagiarismCasesFromAuthor
-      )).flat()
+      )
     )).flat(),
     'plagiarized.id'
   )
 
-  console.log('plagiarismCases.length', plagiarismCases.length)
+  console.log('plagiarismCasesByAuthor.length', plagiarismCasesByAuthor.length)
 
   await asyncMap(
-    authors,
-    async (author) => {
-      const authorPlagiarismCases = plagiarismCases
-        .filter((plagiarismCase) => plagiarismCase.plagiarized.author.name === author)
-
+    plagiarismCasesByAuthor,
+    async (authorPlagiarismCases) => {
       if (
         authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES
           && !isAuthorRepetitive(authorPlagiarismCases)
@@ -113,8 +110,8 @@ async function run ({
           plagiarismCase => processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
         )
       } else {
-        console.log(`trusting ${author}`)
-        await addAuthorToTrustedList(author)
+        console.log(`trusting ${authorPlagiarismCases[0].author.name}`)
+        await addAuthorToTrustedList(authorPlagiarismCases[0].author.name)
       }
     }
   )
@@ -323,7 +320,7 @@ async function addAuthorToFubarList(name) {
   ) {
     console.log(`fubar author: ${name}`)
     db.get('fubarAuthors')
-      .push({ name })
+      .push({ name, processedAt: Date.now() })
       .write()
   }
 }
@@ -335,7 +332,7 @@ async function addAuthorToTrustedList(name) {
       .value()
   ) {
     db.get('trustedAuthors')
-      .push({ name, trustedAt: Date.now() })
+      .push({ name, processedAt: Date.now() })
       .write()
   }
 }
@@ -366,9 +363,17 @@ async function isAuthorTrusted (name) {
     .value()
 }
 
-function cleanup() {
-  return db.get('trustedAuthors')
-    .remove(({trustedAt}) => trustedAt < Date.now() - 1000 * 60 * 60 * 24)
+async function cleanup() {
+  await db.get('trustedAuthors')
+    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
+    .write()
+
+  await db.get('fubarAuthors')
+    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
+    .write()
+
+  await db.get('fubarComments')
+    .remove(({ created }) => created < Date.now() - 1000 * 60 * 60 * 24)
     .write()
 }
 
@@ -428,21 +433,19 @@ const subreddits = [
   'aww',
 ]
 
-run({ authors: ['ClassicEgg7000'] })
-
-// ;(async function () {
-//   while (true) {
-//     try {
-//       const authors = uniqBy(
-//         (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
-//       )
-//       await run({ authors })
-//       await cleanup()
-//     } catch (e) {
-//       console.error(`something went wrong:`)
-//       console.error(e)
-//     }
-//   }
-// })()
+;(async function () {
+  while (true) {
+    try {
+      const authors = uniqBy(
+        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+      )
+      await run({ authors })
+      await cleanup()
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
+})()
 
 module.exports = run
