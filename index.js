@@ -85,7 +85,7 @@ async function run ({
   const plagiarismCases = uniqBy(
     (await asyncMapSerial(
       chunk(authors, AUTHORS_CHUNK_SIZE),
-      (async (authorsChunk) => await asyncMap(
+      async (authorsChunk) => (await asyncMap(
         authorsChunk,
         getPlagiarismCasesFromAuthor
       )).flat()
@@ -122,7 +122,7 @@ async function run ({
   console.log(`done searching`)
 
   // Authors we found along the way, return so we can investigate further
-  return plagiarismCasesByAuthor
+  return plagiarismCases
     .reduce((acc, plagiarismCase) =>
       !authors.includes(plagiarismCase.plagiarized.author.name)
         ? [ ...acc, plagiarismCase.plagiarized.author.name ]
@@ -252,6 +252,7 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
     // wait some time and see if our comments are included.
     // maybe could simplify
     await new Promise((resolve, reject) => {
+      console.log('posted comment, see you in 30 seconds')
       setTimeout(async () => {
         let alreadyResponded
         try {
