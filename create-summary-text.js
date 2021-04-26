@@ -43,10 +43,10 @@ It is probably not a coincidence, because this user has done it before${addition
 beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
 }
 
-function createTable (additionalCases) {
+function createTable (plagiarismCase, additionalCases) {
   return `Original | Plagiarized\n-------- | -----------`
-    + additionalCases.reduce((acc, plagiarismCase) =>
-        acc + `\n[${plagiarismCase.original.permalink}](${plagiarismCase.original.permalink}) | [${plagiarismCase.plagiarized.permalink}](${plagiarismCase.plagiarized.permalink})`
+    + [ plagiarismCase, ...additionalCases ].reduce((acc, additionalCase) =>
+        acc + `\n[${additionalCase.original.permalink}](${additionalCase.original.permalink}) | [${additionalCase.plagiarized.permalink}](${additionalCase.plagiarized.permalink})`
       , '')
 }
 
