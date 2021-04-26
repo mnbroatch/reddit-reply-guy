@@ -82,25 +82,22 @@ async function run ({
     async author => !await isAuthorTrusted(author)
   )
 
-  const plagiarismCases = uniqBy(
+  const plagiarismCasesByAuthor = uniqBy(
     (await asyncMapSerial(
       chunk(authors, AUTHORS_CHUNK_SIZE),
-      async (authorsChunk) => (await asyncMap(
+      async (authorsChunk) => await asyncMap(
         authorsChunk,
         getPlagiarismCasesFromAuthor
-      )).flat()
+      )
     )).flat(),
     'plagiarized.id'
   )
 
-  console.log('plagiarismCases.length', plagiarismCases.length)
+  console.log('plagiarismCasesByAuthor.length', plagiarismCasesByAuthor.length)
 
   await asyncMap(
-    authors,
-    async (author) => {
-      const authorPlagiarismCases = plagiarismCases
-        .filter((plagiarismCase) => plagiarismCase.plagiarized.author.name === author)
-
+    plagiarismCasesByAuthor,
+    async (authorPlagiarismCases) => {
       if (
         authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES
           && !isAuthorRepetitive(authorPlagiarismCases)
@@ -113,8 +110,8 @@ async function run ({
           async (plagiarismCase) => await processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
         )
       } else {
-        console.log(`trusting ${author}`)
-        await addAuthorToTrustedList(author)
+        console.log(`trusting ${authorPlagiarismCases[0].author.name}`)
+        await addAuthorToTrustedList(authorPlagiarismCases[0].author.name)
       }
     }
   )
@@ -248,7 +245,7 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
     ),
   ])
     .then(async ([postedComment]) => new Promise((resolve, reject) => {
-      // wait 10 seconds and see if our comments are included.
+      // wait 30 seconds and see if our comments are included.
       // maybe could simplify
       if (postedComment) {
         setTimeout(async () => {
