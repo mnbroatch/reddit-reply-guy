@@ -82,22 +82,25 @@ async function run ({
     async author => !await isAuthorTrusted(author)
   )
 
-  const plagiarismCasesByAuthor = uniqBy(
+  const plagiarismCases = uniqBy(
     (await asyncMapSerial(
       chunk(authors, AUTHORS_CHUNK_SIZE),
-      async (authorsChunk) => await asyncMap(
+      (async (authorsChunk) => await asyncMap(
         authorsChunk,
         getPlagiarismCasesFromAuthor
-      )
+      )).flat()
     )).flat(),
     'plagiarized.id'
   )
 
-  console.log('plagiarismCasesByAuthor.length', plagiarismCasesByAuthor.length)
+  console.log('plagiarismCases.length', plagiarismCases.length)
 
   await asyncMap(
-    plagiarismCasesByAuthor,
-    async (authorPlagiarismCases) => {
+    authors,
+    async (author) => {
+      const authorPlagiarismCases = plagiarismCases
+        .filter(plagiarismCase => author === plagiarismCase.plagiarized.author.name)
+
       if (
         authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES
           && !isAuthorRepetitive(authorPlagiarismCases)
@@ -110,8 +113,8 @@ async function run ({
           plagiarismCase => processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
         )
       } else {
-        console.log(`trusting ${authorPlagiarismCases[0].author.name}`)
-        await addAuthorToTrustedList(authorPlagiarismCases[0].author.name)
+        console.log(`trusting ${authorPlagiarismCases[0].plagiarized.author.name}`)
+        await addAuthorToTrustedList(authorPlagiarismCases[0].plagiarized.author.name)
       }
     }
   )
@@ -119,7 +122,7 @@ async function run ({
   console.log(`done searching`)
 
   // Authors we found along the way, return so we can investigate further
-  return plagiarismCases
+  return plagiarismCasesByAuthor
     .reduce((acc, plagiarismCase) =>
       !authors.includes(plagiarismCase.plagiarized.author.name)
         ? [ ...acc, plagiarismCase.plagiarized.author.name ]
@@ -234,7 +237,7 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   const shouldReply = !subredditsThatDisallowBots
     .some(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
 
-  await Promise.all([
+  const [ postedReply ] = await Promise.all([
     sendReport(
       plagiarismCase.plagiarized,
       createReportText(plagiarismCase)
@@ -260,7 +263,7 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
 
         if (alreadyResponded) {
           console.log('=======')
-          console.log(`success: http://reddit.com${postedComment.permalink}`)
+          console.log(`success: http://reddit.com${postedReply.permalink}`)
           console.log('=======')
         } else {
           await addCommentToFubarList(plagiarismCase.plagiarized)
