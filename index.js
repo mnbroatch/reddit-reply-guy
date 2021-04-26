@@ -217,11 +217,8 @@ async function getPostsByAuthor(authorName) {
 }
 
 function postReply(comment, message) {
-  return subredditsThatDisallowBots
-    .find(subreddit => subreddit.toLowerCase() === comment.subreddit.display_name.toLowerCase())
-      ? null
-      : comment.reply(message)
-        .catch((e) => addCommentToFubarList(comment))
+  return comment.reply(message)
+    .catch((e) => addCommentToFubarList(comment))
 }
 
 function sendReport(comment, message) {
@@ -237,44 +234,49 @@ async function shouldProcessPlagiarismCase (plagiarismCase) {
 
 async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   const additionalCases = authorPlagiarismCases.filter(c => plagiarismCase !== c)
+  const shouldReply = subredditsThatDisallowBots
+    .find(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
 
-  return Promise.all([
-    postReply(
-      plagiarismCase.plagiarized,
-      createReplyText(plagiarismCase, additionalCases)
-    ),
+  const [ reportResponse, postedComment ] = await Promise.all([
     sendReport(
       plagiarismCase.plagiarized,
       createReportText(plagiarismCase)
     ),
+    shouldReply && postReply(
+      plagiarismCase.plagiarized,
+      createReplyText(plagiarismCase, additionalCases)
+    ),
   ])
-    .then(async ([postedComment]) => new Promise((resolve, reject) => {
-      // wait 10 seconds and see if our comments are included.
-      // maybe could simplify
-      if (postedComment) {
-        setTimeout(async () => {
-          let alreadyResponded
-          try {
-            alreadyResponded = await isAlreadyRespondedTo(plagiarismCase.plagiarized)
-          } catch (e) {
-            console.error(e)
-            alreadyResponded = false
-          }
 
-          if (alreadyResponded) {
-            console.log('=======')
-            console.log(`success: http://reddit.com${postedComment.permalink}`)
-            console.log('=======')
-          } else {
-            await addCommentToFubarList(plagiarismCase.plagiarized)
-          }
-          resolve(plagiarismCase)
-        }, 1000 * 30)
-      } else {
-        console.log('plagiarismCase.plagiarized.subreddit', plagiarismCase.plagiarized.subreddit)
-        resolve(plagiarismCase)
-      }
-    }))
+  console.log('reportResponse', reportResponse)
+
+  if (shouldReply) {
+    // wait some time and see if our comments are included.
+    // maybe could simplify
+    await new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        let alreadyResponded
+        try {
+          alreadyResponded = await isAlreadyRespondedTo(plagiarismCase.plagiarized)
+        } catch (e) {
+          console.error(e)
+          alreadyResponded = false
+        }
+
+        if (alreadyResponded) {
+          console.log('=======')
+          console.log(`success: http://reddit.com${postedComment.permalink}`)
+          console.log('=======')
+        } else {
+          await addCommentToFubarList(plagiarismCase.plagiarized)
+        }
+
+        resolve()
+      }, 1000 * 30)
+    })
+  } else {
+    console.log(`not replying to post in ${plagiarized.plagiarized.subreddit.display_name}`)
+  }
 }
 
 // We may have comments exactly up to the depth of comment,
