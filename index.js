@@ -6,7 +6,7 @@ const chunk = require('lodash/chunk')
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 const { findPlagiarismCases, isSimilar } = require('./find-plagiarism-cases')
-const { createReplyText, createReportText } = require('./create-summary-text')
+const { createReplyText, createReportText, createTable } = require('./create-summary-text')
 
 const adapter = new FileSync('db/db.json')
 const db = low(adapter)
@@ -110,7 +110,7 @@ async function run ({
             authorPlagiarismCases,
             shouldProcessPlagiarismCase,
           ),
-          async (plagiarismCase) => await processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
+          plagiarismCase => processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
         )
       } else {
         console.log(`trusting ${author}`)
@@ -237,6 +237,7 @@ async function shouldProcessPlagiarismCase (plagiarismCase) {
 
 async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   const additionalCases = authorPlagiarismCases.filter(c => plagiarismCase !== c)
+
   return Promise.all([
     postReply(
       plagiarismCase.plagiarized,
@@ -425,19 +426,21 @@ const subreddits = [
   'aww',
 ]
 
-;(async function () {
-  while (true) {
-    try {
-      const authors = uniqBy(
-        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
-      )
-      await run({ authors })
-      await cleanup()
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
-})()
+run({ authors: ['ClassicEgg7000'] })
+
+// ;(async function () {
+//   while (true) {
+//     try {
+//       const authors = uniqBy(
+//         (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+//       )
+//       await run({ authors })
+//       await cleanup()
+//     } catch (e) {
+//       console.error(`something went wrong:`)
+//       console.error(e)
+//     }
+//   }
+// })()
 
 module.exports = run
