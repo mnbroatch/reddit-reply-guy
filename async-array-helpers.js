@@ -1,21 +1,18 @@
 async function asyncReduce(arr, cb, initial = arr) {
-  const acc = initial
-  const arrCopy = [ ...arr ]
-  while (arrCopy.length) {
-    acc = await cb(acc, arrCopy.shift())
+  let acc = initial
+  for (let i = 0, len = arr.length; i < len; i++) {
+    const item = arr[i]
+    acc = await cb(acc, item, i, arr)
   }
   return acc
 }
 
-function asyncFind(arr, cb) {
-  return new Promise((resolve, reject) => {
-    let x = Promise.all(
-      arr.map(function () {
-        const result = cb(...arguments)
-        if (result) resolve(arguments[0])
-      })
-    )
-  })
+async function asyncFind(arr, cb) {
+  for (let i = 0, len = arr.length; i < len; i++) {
+    const item = arr[i]
+    if (await cb(item, i)) return item
+  }
+  return null
 }
 
 // Discards rejected items
@@ -35,14 +32,14 @@ async function asyncMapSerial(arr, cb) {
 }
 
 async function asyncEvery(arr, cb) {
-  return !!asyncFind(arr, cb)
-}
-
-async function asyncSome(arr, cb) {
-  return !await asyncEvery(
+  return !await asyncFind(
     arr,
     async (item) => !await cb(item)
   )
+}
+
+async function asyncSome(arr, cb) {
+  return !!asyncFind(arr, cb)
 }
 
 async function asyncFilter (arr, cb) {
@@ -64,4 +61,5 @@ module.exports = {
   asyncMap,
   asyncMapSerial,
   asyncFilter,
+  asyncReduce,
 }

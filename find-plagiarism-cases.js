@@ -1,18 +1,19 @@
 const compareTwoStrings = require('string-similarity').compareTwoStrings
+const { asyncMap, asyncFind, asyncEvery, asyncReduce } = require('./async-array-helpers')
 
 const authorWhitelist = [
   'SaveVideo',
   'savevideobot',
   'Quoterm',
   'Lars_porsenna',
-  // 'Jaysog',
+  'Jaysog',
   '[deleted]',
 ]
 
 const subredditWhitelist = [
   'FreeKarma4U',
   'Superstonk',
-  // '196',
+  '196',
 ]
 
 const criteria = [
@@ -69,7 +70,7 @@ const criteria = [
   },
   {
     description: 'Is the comment different from ancestors?',
-    test: (original, maybePlagiarized, post) => 
+    test: (original, maybePlagiarized, post) =>
       !isSimilarToAncestor(maybePlagiarized, post)
   },
 ]
@@ -86,19 +87,12 @@ function isSimilarToAncestor(comment, post) {
   try {
   const ancestors = []
   let parentId = comment.parent_id 
-  console.log('===================')
-  console.log('comment.link_id', comment.link_id)
-  console.log('comment.body', comment.body)
   while (parentId !== comment.link_id) {
-    console.log('----------------')
-    console.log('parentId', parentId)
     const parent = post.comments.find(c => c.name === parentId)
     if (parent) {
-      console.log('parent.body', parent.body)
       ancestors.push(parent)
       parentId = parent.parent_id
     } else {
-      console.log('999999', 999999)
       break
     }
   }
@@ -110,45 +104,43 @@ function isSimilarToAncestor(comment, post) {
 }
 
 // TODO: swallows errors
-// can cut time down with smarter looping/pairing
 function findPlagiarismCases(post) {
-  return post.comments.reduce((acc, comment) => {
-    const plagiarized = findPlagiarizedComment(comment, post)
-
-    if (plagiarized) {
-      console.log('~~~~~~~~~~~~~~~')
-      console.log('comment.body', comment.body)
-      console.log('~~~~~~~~~~~~~~~')
-    }
-
+  return asyncReduce(post.comments, async (acc, comment, i) => {
+    const plagiarized = await findPlagiarizedComment(comment, post, i)
     return plagiarized
       ? [ ...acc, { original: comment, plagiarized } ]
       : acc
   }, [])
 }
 
-function findPlagiarizedComment (original, post) {
-  return post.comments.find(maybePlagiarized => {
-    return criteria.every((criterion, i) => {
-      const doesPass = criterion.test(original, maybePlagiarized, post)
-
-      if (typeof process.env.VERBOSITY === 'number' && !doesPass && i > VERBOSITY) {
-        logCriterion(criterion, original, maybePlagiarized)
+// startingIndex prevents double checks
+function findPlagiarizedComment (original, post, startingIndex) {
+  return asyncFind(post.comments.slice(startingIndex + 1), maybePlagiarized =>
+    asyncEvery(criteria, async (criterion, i) => {
+  try {
+      if (await criterion.test(original, maybePlagiarized, post)) {
+        return true
+      } else {
+        logCriterionFailure(criterion, original, maybePlagiarized, i)
+        return false
       }
-
-      return doesPass
+  } catch (e) {
+    console.error(e)
+  }
     })
-  })
+  )
 }
 
-function logCriterion (criterion, original, maybePlagiarized) {
-  console.log('~~~~~~~~~~~~~~~')
-  console.log(`failed: ${criterion.description}`)
-  console.log(`${maybePlagiarized.body.slice(0, 50)}${maybePlagiarized.body.length > 50 ? '...' : ''}`)
-  console.log('c.maybePlagiarized.author.name', maybePlagiarized.author.name)
-  console.log(`http://reddit.com${maybePlagiarized.permalink}`)
-  console.log(`http://reddit.com${original.permalink}`)
-  console.log('~~~~~~~~~~~~~~~')
+function logCriterionFailure (criterion, original, maybePlagiarized, i) {
+  if (typeof process.env.VERBOSITY === 'number' && i > VERBOSITY) {
+    console.log('~~~~~~~~~~~~~~~')
+    console.log(`failed: ${criterion.description}`)
+    console.log(`${maybePlagiarized.body.slice(0, 50)}${maybePlagiarized.body.length > 50 ? '...' : ''}`)
+    console.log('c.maybePlagiarized.author.name', maybePlagiarized.author.name)
+    console.log(`http://reddit.com${maybePlagiarized.permalink}`)
+    console.log(`http://reddit.com${original.permalink}`)
+    console.log('~~~~~~~~~~~~~~~')
+  }
 }
 
 module.exports = { isSimilar, findPlagiarismCases }

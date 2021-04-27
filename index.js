@@ -142,9 +142,9 @@ async function run ({
 
 async function getPlagiarismCasesFromAuthor(author) {
   console.log(`getting posts by ${author}`)
-  const authors = await getPostsByAuthor(author)
+  const posts = await getPostsByAuthor(author)
   console.log(`finding plagiarism by ${author}`)
-  const plagiarismCases = flatMap(authors, findPlagiarismCases)
+  const plagiarismCases = (await asyncMap(posts, findPlagiarismCases)).flat()
   console.log(`${plagiarismCases.length} plagiarism cases found by ${author}`)
   return plagiarismCases
 }
@@ -308,9 +308,9 @@ async function isAlreadyRespondedTo(comment) {
   }
 }
 
-function getPlagiaristsFromPosts(posts) {
+async function getPlagiaristsFromPosts(posts) {
   return uniqBy(
-    flatMap(posts, findPlagiarismCases),
+    (await asyncMap(posts, findPlagiarismCases)).flat(),
     'plagiarized.author.name'
   ).map(plagiarismCase => plagiarismCase.plagiarized.author.name)
 }
