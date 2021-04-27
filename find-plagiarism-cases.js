@@ -97,11 +97,10 @@ function isSimilarToAncestor(comment, post) {
 function findPlagiarismCases(post) {
   const verbose = process.env.VERBOSE 
   return post.comments.reduce((acc, comment) => {
-    const plagiarized = post.comments.find(c =>
-      criteria.every((criterion, i) => {
+    const plagiarized = post.comments.find(c => {
+      return criteria.every((criterion, i) => {
         const doesPass = criterion.test(comment, c, post)
         if (verbose && !doesPass && i > 4) {
-          console.log('verbose', verbose)
           console.log('~~~~~~~~~~~~~~~')
           console.log(`failed: ${criterion.description}`)
           console.log(`${c.body.slice(0, 50)}${c.body.length > 50 ? '...' : ''}`)
@@ -112,7 +111,7 @@ function findPlagiarismCases(post) {
         }
         return doesPass
       })
-    )
+    })
 
     return plagiarized
       ? [ ...acc, { original: comment, plagiarized } ]
