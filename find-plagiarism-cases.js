@@ -110,24 +110,10 @@ function isSimilarToAncestor(comment, post) {
 }
 
 // TODO: swallows errors
+// can cut time down with smarter looping/pairing
 function findPlagiarismCases(post) {
-  const verbose = process.env.VERBOSE 
   return post.comments.reduce((acc, comment) => {
-    const plagiarized = post.comments.find(c => {
-      return criteria.every((criterion, i) => {
-        const doesPass = criterion.test(comment, c, post)
-        if (verbose && !doesPass && i > 4) {
-          console.log('~~~~~~~~~~~~~~~')
-          console.log(`failed: ${criterion.description}`)
-          console.log(`${c.body.slice(0, 50)}${c.body.length > 50 ? '...' : ''}`)
-          console.log('c.plagiarized.author.name', c.author.name)
-          console.log(`http://reddit.com${c.permalink}`)
-          console.log(`http://reddit.com${comment.permalink}`)
-          console.log('~~~~~~~~~~~~~~~')
-        }
-        return doesPass
-      })
-    })
+    const plagiarized = findPlagiarizedComment(comment, post)
 
     if (plagiarized) {
       console.log('~~~~~~~~~~~~~~~')
@@ -139,6 +125,30 @@ function findPlagiarismCases(post) {
       ? [ ...acc, { original: comment, plagiarized } ]
       : acc
   }, [])
+}
+
+function findPlagiarizedComment (original, post) {
+  return post.comments.find(maybePlagiarized => {
+    return criteria.every((criterion, i) => {
+      const doesPass = criterion.test(original, maybePlagiarized, post)
+
+      if (typeof process.env.VERBOSITY === 'number' && !doesPass && i > VERBOSITY) {
+        logCriterion(criterion, original, maybePlagiarized)
+      }
+
+      return doesPass
+    })
+  })
+}
+
+function logCriterion (criterion, original, maybePlagiarized) {
+  console.log('~~~~~~~~~~~~~~~')
+  console.log(`failed: ${criterion.description}`)
+  console.log(`${maybePlagiarized.body.slice(0, 50)}${maybePlagiarized.body.length > 50 ? '...' : ''}`)
+  console.log('c.maybePlagiarized.author.name', maybePlagiarized.author.name)
+  console.log(`http://reddit.com${maybePlagiarized.permalink}`)
+  console.log(`http://reddit.com${original.permalink}`)
+  console.log('~~~~~~~~~~~~~~~')
 }
 
 module.exports = { isSimilar, findPlagiarismCases }
