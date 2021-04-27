@@ -98,8 +98,6 @@ async function run ({
     'plagiarized.id'
   )
 
-  console.log('plagiarismCases.length', plagiarismCases.length)
-
   await asyncMap(
     authors,
     async (author) => {
@@ -209,7 +207,6 @@ async function getPostsByAuthor(authorName) {
           : post
       } catch (e) {
         console.log(`couldn't get post with comment: http://reddit.com${comment.permalink}`)
-        console.log('comment.link_id', comment.link_id)
         await addPostToFubarList(comment.link_id)
         return null
       }
@@ -228,9 +225,10 @@ function postReply(comment, message) {
 
 function sendReport(comment, message) {
   return comment.report({ reason: message })
-    .catch((e) => {
-      console.error(`Couldn't report comment: `)
-      console.error(e)
+    .catch(async (e) => {
+      console.error(`Couldn't report comment: http://reddit.com${comment.permalink}`)
+      await addCommentToFubarList(comment)
+      return null
     })
 }
 
@@ -255,14 +253,14 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
     .some(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
 
   const [{status: postResponse}] = await Promise.allSettled([
-    // shouldReply && postReply(
-    //   plagiarismCase.plagiarized,
-    //   createReplyText(plagiarismCase, additionalCases)
-    // ),
-    // sendReport(
-    //   plagiarismCase.plagiarized,
-    //   createReportText(plagiarismCase)
-    // ),
+    shouldReply && postReply(
+      plagiarismCase.plagiarized,
+      createReplyText(plagiarismCase, additionalCases)
+    ),
+    sendReport(
+      plagiarismCase.plagiarized,
+      createReportText(plagiarismCase)
+    ),
   ])
 
   if (shouldReply && postResponse.value) {
@@ -414,6 +412,7 @@ async function cleanup() {
 }
 
 const subreddits = [
+  'CODWarzone',
   'todayilearned',
   'OutOfTheLoop',
   'iamatotalpieceofshit',
@@ -469,26 +468,26 @@ const subreddits = [
   'food',
 ]
 
-// ;(async function () {
-//   while (true) {
-//     try {
-//       const authors = uniqBy(
-//         (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
-//       )
-//       await run({ authors })
-//       await cleanup()
-//     } catch (e) {
-//       console.error(`something went wrong:`)
-//       console.error(e)
-//     }
-//   }
-// })()
+;(async function () {
+  while (true) {
+    try {
+      const authors = uniqBy(
+        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+      )
+      await run({ authors })
+      await cleanup()
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
+})()
 
-run({
-  authors: [
-    'Jaysog'
-  ],
-  logTable: true,
-})
+// run({
+//   authors: [
+//     'deSuspect'
+//   ],
+//   logTable: true,
+// })
 
 module.exports = run
