@@ -5,12 +5,14 @@ const authorWhitelist = [
   'savevideobot',
   'Quoterm',
   'Lars_porsenna',
+  // 'Jaysog',
   '[deleted]',
 ]
 
 const subredditWhitelist = [
   'FreeKarma4U',
   'Superstonk',
+  // '196',
 ]
 
 const criteria = [
@@ -47,11 +49,6 @@ const criteria = [
       || original.parent_id !== maybePlagiarized.parent_id
   },
   {
-    description: 'Is the comment different from ancestors?',
-    test: (original, maybePlagiarized, post) => 
-      !isSimilarToAncestor(maybePlagiarized, post)
-  },
-  {
     description: 'Is subreddit not whitelisted?',
     test: (original, maybePlagiarized) =>
       !subredditWhitelist
@@ -70,6 +67,11 @@ const criteria = [
         || !/^\/?u\//.test(firstWord) && !/^\/?r\//.test(firstWord) 
     },
   },
+  {
+    description: 'Is the comment different from ancestors?',
+    test: (original, maybePlagiarized, post) => 
+      !isSimilarToAncestor(maybePlagiarized, post)
+  },
 ]
 
 function stripQuote(comment) {
@@ -81,19 +83,33 @@ function stripQuote(comment) {
 // Breaks if we didn't fetch the whole thread from root to comment.
 // Currently if it breaks, we consider it not to match an ancestor.
 function isSimilarToAncestor(comment, post) {
+  try {
   const ancestors = []
   let parentId = comment.parent_id 
+  console.log('===================')
+  console.log('comment.link_id', comment.link_id)
+  console.log('comment.body', comment.body)
   while (parentId !== comment.link_id) {
+    console.log('----------------')
+    console.log('parentId', parentId)
     const parent = post.comments.find(c => c.name === parentId)
     if (parent) {
+      console.log('parent.body', parent.body)
       ancestors.push(parent)
       parentId = parent.parent_id
-    } else break
+    } else {
+      console.log('999999', 999999)
+      break
+    }
   }
 
   return ancestors.some(ancestor => isSimilar(comment.body, ancestor.body))
+  } catch (e) {
+    console.log(e)
+  }
 }
 
+// TODO: swallows errors
 function findPlagiarismCases(post) {
   const verbose = process.env.VERBOSE 
   return post.comments.reduce((acc, comment) => {
@@ -112,6 +128,12 @@ function findPlagiarismCases(post) {
         return doesPass
       })
     })
+
+    if (plagiarized) {
+      console.log('~~~~~~~~~~~~~~~')
+      console.log('comment.body', comment.body)
+      console.log('~~~~~~~~~~~~~~~')
+    }
 
     return plagiarized
       ? [ ...acc, { original: comment, plagiarized } ]

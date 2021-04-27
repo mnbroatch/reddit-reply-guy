@@ -254,18 +254,18 @@ async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
   const shouldReply = !subredditsThatDisallowBots
     .some(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
 
-  await Promise.allSettled([
-    shouldReply && postReply(
-      plagiarismCase.plagiarized,
-      createReplyText(plagiarismCase, additionalCases)
-    ),
-    sendReport(
-      plagiarismCase.plagiarized,
-      createReportText(plagiarismCase)
-    ),
+  const [{status: postResponse}] = await Promise.allSettled([
+    // shouldReply && postReply(
+    //   plagiarismCase.plagiarized,
+    //   createReplyText(plagiarismCase, additionalCases)
+    // ),
+    // sendReport(
+    //   plagiarismCase.plagiarized,
+    //   createReportText(plagiarismCase)
+    // ),
   ])
 
-  if (shouldReply) {
+  if (shouldReply && postResponse.value) {
     // wait some time and see if our comments are included.
     // maybe could simplify
     await new Promise((resolve, reject) => {
@@ -469,26 +469,26 @@ const subreddits = [
   'food',
 ]
 
-;(async function () {
-  while (true) {
-    try {
-      const authors = uniqBy(
-        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
-      )
-      await run({ authors })
-      await cleanup()
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
-})()
+// ;(async function () {
+//   while (true) {
+//     try {
+//       const authors = uniqBy(
+//         (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+//       )
+//       await run({ authors })
+//       await cleanup()
+//     } catch (e) {
+//       console.error(`something went wrong:`)
+//       console.error(e)
+//     }
+//   }
+// })()
 
-// run({
-//   authors: [
-//   'stabilityinfinity'
-//   ],
-//   logTable: true,
-// })
+run({
+  authors: [
+    'Jaysog'
+  ],
+  logTable: true,
+})
 
 module.exports = run

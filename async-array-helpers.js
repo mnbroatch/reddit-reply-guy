@@ -1,4 +1,13 @@
-async function asyncFind(arr, cb) {
+async function asyncReduce(arr, cb, initial = arr) {
+  const acc = initial
+  const arrCopy = [ ...arr ]
+  while (arrCopy.length) {
+    acc = await cb(acc, arrCopy.shift())
+  }
+  return acc
+}
+
+function asyncFind(arr, cb) {
   return new Promise((resolve, reject) => {
     let x = Promise.all(
       arr.map(function () {
