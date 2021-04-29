@@ -9,6 +9,7 @@
   "author": "mnbroatch@gmail.com",
   "license": "ISC",
   "dependencies": {
+    "asyncpipe": "^1.0.0",
     "dotenv": "^8.2.0",
     "lowdb": "^1.0.0",
     "snoowrap": "^1.22.0",

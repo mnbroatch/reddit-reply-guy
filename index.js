@@ -2,12 +2,12 @@ require('dotenv').config()
 const Snoowrap = require('snoowrap')
 const uniqBy = require('lodash/uniqBy')
 const flatMap = require('lodash/flatMap')
-const chunk = require('lodash/chunk')
+const groupBy = require('lodash/groupBy')
 const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
-const { findPlagiarismCases, isSimilar } = require('./find-plagiarism-cases')
+const { findCommentPairs, isSimilar } = require('./find-comment-pairs')
 const { createReplyText, createReportText, createTable } = require('./create-summary-text')
-const { asyncMap, asyncMapSerial, asyncFilter } = require('./async-array-helpers')
+const { asyncMap, asyncMapSerial, asyncFilter, asyncNot, asyncReduce } = require('./async-array-helpers')
 
 const adapter = new FileSync('db/db.json')
 const db = low(adapter)
@@ -15,8 +15,8 @@ const db = low(adapter)
 db
   .defaults({
     fubarComments: [],
-    fubarAuthors: [],
-    trustedAuthors: [],
+    fubarPosts: [],
+    authorCooldowns: [],
   })
   .write()
 
@@ -72,111 +72,190 @@ async function run ({
   authors,
   logTable,
 }) {
+  console.log('===========================================')
   if (subreddit) {
     console.log(`searching in /r/${subreddit}`)
   } else {
     console.log(`searching ${authors?.length || 0} authors`)
   }
 
-  // only an optimization, these authors' comments could still be
-  // detected in others' retrieved posts.
+  // Filter is only an optimization, these authors' comments
+  // could still be detected in others' retrieved posts.
   authors = await asyncFilter(
-    authors || await getPlagiaristsFromPosts(await getPosts(subreddit)),
-    async author => !await isAuthorTrusted(author) && !await isAuthorFubar(author)
+    authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit)),
+    asyncNot(isAuthorOnCooldown)
   )
 
-  console.log('authors', authors)
+  console.log(`investigating ${authors.length} suspected plagiarists:`)
+  authors.forEach((author) => console.log(author))
 
-  const plagiarismCases = uniqBy(
-    (await asyncMapSerial(
-      chunk(authors, AUTHORS_CHUNK_SIZE),
-      async (authorsChunk) => (await asyncMap(
-        authorsChunk,
-        getPlagiarismCasesFromAuthor
-      )).flat()
-    )).flat(),
-    'plagiarized.id'
+  const comments = uniqBy(
+    await asyncFilter(
+      (await asyncMap(
+        authors,
+        getCommentsFromAuthor
+      )).flat(),
+      asyncNot(isCommentFubar)
+    ),
+    'id'
   )
 
-  await asyncMap(
-    authors,
-    async (author) => {
-      const authorPlagiarismCases = plagiarismCases
-        .filter(plagiarismCase => author === plagiarismCase.plagiarized.author.name)
+  const posts = uniqBy(
+    await asyncFilter(
+      await asyncMap(
+        comments,
+        getPostFromComment,
+      ),
+      asyncNot(isPostFubar)
+    ),
+    'id'
+  )
 
-      if (logTable)  {
-        console.log('createTable(plagiarismCases)', createTable(authorPlagiarismCases))
-      }
+  console.log('posts.length', posts.length)
 
-      if (
-        authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES
-          && !isAuthorRepetitive(authorPlagiarismCases)
-      ) {
-        await asyncMap(
-          await asyncFilter(
-            authorPlagiarismCases,
-            shouldProcessPlagiarismCase,
-          ),
-          plagiarismCase => processPlagiarismCase(plagiarismCase, authorPlagiarismCases)
-        )
-      } else if (authorPlagiarismCases[0]) {
-        console.log(`trusting ${authorPlagiarismCases[0].plagiarized.author.name}`)
-        await addAuthorToTrustedList(authorPlagiarismCases[0].plagiarized.author.name)
+  const commentPairs = uniqBy(
+    await asyncFilter(
+      (await asyncMap(
+        posts,
+        findCommentPairs
+      )).flat(),
+      async commentPair => !await isCommentFubar(commentPair.copy)
+    ),
+    'copy.id'
+  )
+
+  const commentPairsPerAuthor = Object.values(
+    groupBy(
+      commentPairs,
+      'copy.author.name'
+    )
+  ).filter(authorCommentPairs => !isAuthorRepetitive(authorCommentPairs)) // maybe bulk this code up if more author-level checks are needed
+
+  console.log(`${commentPairsPerAuthor.flat().length} total cases found`)
+
+  const { pendingTrial = [], guilty = [], innocent = [] } = groupBy(
+    commentPairsPerAuthor,
+    (authorCommentPairs) => {
+      let key
+      let value = authorCommentPairs
+      if (!authors.some(author => author === authorCommentPairs[0].copy.author.name)) {
+        return 'pendingTrial'
+      } else if (authorCommentPairs.length >= MIN_PLAGIARIST_CASES){
+        return 'guilty'
+      } else {
+        return 'innocent'
       }
-      console.log(`done processing ${author}`)
     }
   )
 
-  console.log(`done searching`)
+  await asyncMap( 
+    innocent,
+    authorCommentPairs => updateAuthorCooldown(authorCommentPairs[0].copy.author.name)
+  )
 
-  // Authors we found along the way, return so we can investigate further
-  return plagiarismCases
-    .reduce((acc, plagiarismCase) =>
-      !authors.includes(plagiarismCase.plagiarized.author.name)
-        ? [ ...acc, plagiarismCase.plagiarized.author.name ]
-        : acc
-    , [])
-}
+  await asyncMap( 
+    guilty,
+    authorCommentPairs => updateAuthorCooldown(authorCommentPairs[0].copy.author.name, authorCommentPairs.length)
+  )
 
-async function getPlagiarismCasesFromAuthor(author) {
-  console.log(`getting posts by ${author}`)
-  const posts = await getPostsByAuthor(author)
-  console.log(`finding plagiarism by ${author}`)
-  const plagiarismCases = (await asyncMap(posts, findPlagiarismCases)).flat()
-  console.log(`${plagiarismCases.length} plagiarism cases found by ${author}`)
-  return plagiarismCases
+  console.log(`processing ${guilty.flat().length} cases`)
+
+  const processingResults = await asyncMap(
+    guilty,
+    async authorCommentPairs => await asyncMap(
+      await asyncFilter(
+        authorCommentPairs,
+        shouldProcessCommentPair
+      ),
+      commentPair => processCommentPair(commentPair, authorCommentPairs)
+    )
+  )
+
+  commentPairsPerAuthor.forEach((authorCommentPairs) => {
+    const author = authorCommentPairs[0].copy.author.name
+
+    console.log('-------------------------------------')
+    console.log('author', author)
+
+    if (innocent.some((innocentAuthorCommentPairs) => innocentAuthorCommentPairs[0].copy.author.name === author)) {
+      console.log(`found innocent with ${authorCommentPairs.length} cases`)
+    } else if (pendingTrial.some((pendingTrialAuthorCommentPairs) => pendingTrialAuthorCommentPairs[0].copy.author.name === author)) {
+      console.log(`will be searched later`)
+    } else {
+      processingResults.find(results => results[0].author.name === author)
+        .forEach((authorResults) => {
+        const { skipped, broken, success } = groupBy(
+          authorResults,
+          result => {
+            if (!result.shouldReply) {
+              return 'skipped'
+            } else if (result.shouldReply && !result.hasBotReply) {
+              return 'broken'
+            } else {
+              return 'success'
+            }
+          }
+        )
+        console.log(`had ${authorCommentPairs.length} processed cases:`)
+        console.log(`${success?.length || 0} suceeded`)
+        console.log(`${skipped?.length || 0} skipped`)
+        console.log(`${broken?.length || 0} broken`)
+      })
+    } 
+
+    if (logTable)  {
+      guilty.forEach((authorCommentPairs) => {
+        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+        console.log(createTable(authorCommentPairs))
+        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+      })
+    }
+
+    console.log('-------------------------------------')
+  })
+  console.log('===========================================')
+
+  // return authors we found along the way but didn't audit, so we can investigate further
+  return pendingTrial.map(authorCommentPairs => authorCommentPairs[0].copy.author.name)
 }
 
 // The idea here is that a copy bot will not always post the same thing.
 // Inspired by some commenters that only ever post "sorry for your loss"
 // Half might be too generous, especially if bots catch on.
-function isAuthorRepetitive(authorPlagiarismCases) {
-  return authorPlagiarismCases.reduce((acc, plagiarismCase) => {
-    const numSimilar = authorPlagiarismCases
-      .filter(c => isSimilar(c.plagiarized.body, plagiarismCase.plagiarized.body))
+function isAuthorRepetitive(authorCommentPairs) {
+  return authorCommentPairs.reduce((acc, commentPair) => {
+    const numSimilar = authorCommentPairs
+      .filter(c => c !== commentPair && isSimilar(c.copy.body, commentPair.copy.body))
       .length
     return numSimilar > acc ? numSimilar : acc
-  }, 0) > authorPlagiarismCases.length / 2
+  }, 0) > authorCommentPairs.length / 2
 }
 
-// FIXME: seems like post metadata is lost?
-// Not needed currently but a little dragonsy
-async function getPosts(subreddit) {
+async function getInitialPosts(subreddit) {
   let posts = []
   try {
     posts = await snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
-      .map(post => getPostWithComments(post.id))
+      .map(post => getPost(post.id))
   } catch (e) {
-    console.log(`Could not get posts from ${subreddit}: `, e.message)
+    console.error(`Could not get posts from ${subreddit}: `, e.message)
   }
   return posts
 }
 
-async function getPostWithComments (postId) {
-  const post = await snoowrap.getSubmission(postId)
-  return { ...post, comments: flattenReplies(await post.comments) }
+async function getPost (postId) {
+  try {
+    const post = await snoowrap.getSubmission(postId)
+    return {
+      id: await post.id,
+      comments: flattenReplies(await post.comments)
+    }
+  } catch (e) {
+    console.error(`couldn't get post: ${postId}`)
+    await addPostToFubarList(postId)
+  }
 }
 
+// TODO: remove nested reply structure
 function flattenReplies(comments) {
   return comments.reduce((acc, comment) => {
     if (!comment.replies.length) {
@@ -187,37 +266,28 @@ function flattenReplies(comments) {
   }, [])
 }
 
-async function getPostsByAuthor(authorName) {
-  let authorComments = []
+async function getCommentsFromAuthor(author) {
   try {
-    authorComments = await snoowrap.getUser(authorName).getComments({ limit: AUTHOR_POST_LIMIT })
+    return snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
   } catch (e) {
-    console.log(`fubar author: http://reddit.com/u/${authorName}`)
-    await addAuthorToFubarList(authorName)
+    console.error(`couldn't get author comments: http://reddit.com/u/${author}`)
+    await updateAuthorCooldown(author)
+    return []
   }
+}
 
-  return (await asyncMap(
-    authorComments,
-    async (comment) => {
-      try {
-        const post = await getPostWithComments(comment.link_id)
-        // include starting comment in case we didn't receive it
-        return !post.comments.some(c => c.id === comment.id)
-          ? { ...post, comments: post.comments.concat(comment) }
-          : post
-      } catch (e) {
-        console.log(`couldn't get post with comment: http://reddit.com${comment.permalink}`)
-        await addPostToFubarList(comment.link_id)
-        return null
-      }
-    }
-  )).filter(Boolean)
+async function getPostFromComment(comment) {
+  const post = await getPost(comment.link_id)
+  // include starting comment in case we didn't receive it
+  return !post.comments.some(c => c.id === comment.id)
+    ? { ...post, comments: [ ...post.comments, comment ] }
+    : post
 }
 
 function postReply(comment, message) {
   return comment.reply(message)
     .catch(async (e) => {
-      console.log(`couldn't post reply to: http://reddit.com${comment.permalink}`)
+      console.error(`couldn't post reply to: http://reddit.com${comment.permalink}`)
       await addCommentToFubarList(comment)
       return null
     })
@@ -232,95 +302,93 @@ function sendReport(comment, message) {
     })
 }
 
-async function shouldProcessPlagiarismCase (plagiarismCase) {
-  let alreadyResponded
+async function shouldProcessCommentPair (commentPair) {
+  let alreadyResponded = false
+  let isFubar = false
   try {
-    alreadyResponded = await isAlreadyRespondedTo(plagiarismCase.plagiarized)
+    alreadyResponded = await isAlreadyRespondedTo(commentPair.copy)
   } catch (e) {
-    console.log(`couldn't get replies for comment: http://reddit.com${comment.permalink}`)
+    console.error(`couldn't get comment: http://reddit.com${commentPair.copy.permalink}`)
+    isFubar = true
     await addCommentToFubarList(comment)
-    return false
   }
 
-  return !await isCommentFubar(plagiarismCase.plagiarized)
-    && !isCommentTooOld(plagiarismCase.plagiarized)
-    && !alreadyResponded
+  return !alreadyResponded
+    && !isFubar
+    && !isCommentTooOld(commentPair.copy)
 }
 
-async function processPlagiarismCase (plagiarismCase, authorPlagiarismCases) {
-  const additionalCases = authorPlagiarismCases.filter(c => plagiarismCase !== c)
+async function processCommentPair (commentPair, authorCommentPairs) {
+  try{
+  const additionalCases = authorCommentPairs.filter(c => commentPair !== c)
   const shouldReply = !subredditsThatDisallowBots
-    .some(subreddit => subreddit.toLowerCase() === plagiarismCase.plagiarized.subreddit.display_name.toLowerCase())
+    .some(subreddit => subreddit.toLowerCase() === commentPair.copy.subreddit.display_name.toLowerCase())
 
-  const [{status: postResponse}] = await Promise.allSettled([
+  const [postResponse] = await Promise.allSettled([
     shouldReply && postReply(
-      plagiarismCase.plagiarized,
-      createReplyText(plagiarismCase, additionalCases)
+      commentPair.copy,
+      createReplyText(commentPair, additionalCases)
     ),
     sendReport(
-      plagiarismCase.plagiarized,
-      createReportText(plagiarismCase)
+      commentPair.copy,
+      createReportText(commentPair)
     ),
   ])
 
+  // wait some time and see if our comments are included.
+  let hasBotReply = false
   if (shouldReply && postResponse.value) {
-    // wait some time and see if our comments are included.
-    // maybe could simplify
     await new Promise((resolve, reject) => {
-      console.log('posted comment, see you in 30 seconds')
       setTimeout(async () => {
-        let alreadyResponded
         try {
-          alreadyResponded = await isAlreadyRespondedTo(plagiarismCase.plagiarized)
+          hasBotReply = await isAlreadyRespondedTo(commentPair.copy)
         } catch (e) {
-          console.error(e)
-          alreadyResponded = false
+          console.error(e.message)
         }
-
-        if (alreadyResponded) {
-          console.log('=======')
-          console.log(`success: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
-          console.log('=======')
-        } else {
-          console.log(`bot reply not retrieved on: http://reddit.com${plagiarismCase.plagiarized.permalink}`)
-          await addCommentToFubarList(plagiarismCase.plagiarized)
-        }
-
         resolve()
       }, 1000 * 30)
     })
-  } else {
-    console.log(`not replying to post in ${plagiarismCase.plagiarized.subreddit.display_name}`)
+
+    if (!hasBotReply) {
+      console.error(`bot reply not retrieved on: http://reddit.com${commentPair.copy.permalink}`)
+      await addCommentToFubarList(commentPair.copy)
+    } 
+  }
+
+  return {
+    author: commentPair.copy.author.name,
+    shouldReply,
+    hasBotReply,
+  }
+  } catch (e) {
+    console.error(e)
   }
 }
 
 // We may have comments exactly up to the depth of comment,
 // and we need to check the comment's replies for one of ours.
 async function isAlreadyRespondedTo(comment) {
-  try {
-    const replies = comment.replies.length
-      ? comment.replies
-      : (await comment.expandReplies({ depth: 1 })).replies
-    return replies.some(reply => reply.author_fullname === BOT_USER_ID)
-  } catch (e) {
-  }
+  const replies = comment.replies.length
+    ? comment.replies
+    : (await comment.expandReplies({ depth: 1 })).replies
+  return replies.some(reply => reply.author_fullname === BOT_USER_ID)
 }
 
 async function getPlagiaristsFromPosts(posts) {
   return uniqBy(
-    (await asyncMap(posts, findPlagiarismCases)).flat(),
-    'plagiarized.author.name'
-  ).map(plagiarismCase => plagiarismCase.plagiarized.author.name)
+    (await asyncMap(posts, findCommentPairs)).flat(),
+    'copy.author.name'
+  ).map(commentPair => commentPair.copy.author.name)
 }
 
-async function addCommentToFubarList({ id, created }) {
+async function addCommentToFubarList({ id }) {
   if (
     !await db.get('fubarComments')
       .find({ id })
       .value()
   ) {
     db.get('fubarComments')
-      .push({ id, created })
+      .push({ id, processedAt: Date.now() })
       .write()
   }
 }
@@ -337,28 +405,51 @@ async function addPostToFubarList(id) {
   }
 }
 
-async function addAuthorToFubarList(name) {
+function getAuthorCooldown(name) {
+  return db.get('authorCooldowns')
+    .find({ name })
+    .value()
+}
+
+async function addOrUpdateAuthorCooldown(name, cooldownStart, cooldownEnd, copyCount) {
   if (
-    !await db.get('fubarAuthors')
+    !await db.get('authorCooldowns')
       .find({ name })
       .value()
   ) {
-    db.get('fubarAuthors')
-      .push({ name, processedAt: Date.now() })
+    db.get('authorCooldowns')
+      .push({ name, cooldownStart, cooldownEnd, copyCount })
+      .write()
+  } else {
+    db.get('authorCooldowns')
+      .assign({ name, cooldownStart, cooldownEnd, copyCount })
       .write()
   }
 }
 
-async function addAuthorToTrustedList(name) {
+async function updateAuthorCooldown(name, copyCount = 0) {
+  const maybeAuthor = await getAuthorCooldown(name)
+  const now = Date.now()
+
+  // cooldown doubles up to 1 day unless new cases are found.
+  let cooldownEnd
   if (
-    !await db.get('trustedAuthors')
-      .find({ name })
-      .value()
+    copyCount > MIN_PLAGIARIST_CASES
+    && copyCount !== maybeAuthor?.copyCount // not stale, count has changed
   ) {
-    db.get('trustedAuthors')
-      .push({ name, processedAt: Date.now() })
-      .write()
+    cooldownEnd = now
+  } else {
+    cooldownEnd = maybeAuthor
+      ? now + Math.min((now - author.cooldownStart) * 2, 1000 * 60 * 60 * 24)
+      : now + 1000 * 60 * 60
   }
+
+  return addOrUpdateAuthorCooldown(
+    name,
+    now,
+    cooldownEnd,
+    copyCount
+  )
 }
 
 function isCommentTooOld({ created }) {
@@ -381,29 +472,18 @@ async function isPostFubar ({ id }) {
     .value()
 }
 
-async function isAuthorFubar (name) {
-  return !!await db.get('fubarAuthors')
-    .find({ name })
-    .value()
+async function isAuthorOnCooldown (author) {
+  return (await getAuthorCooldown(author))?.cooldownEnd > Date.now()
 }
 
-async function isAuthorTrusted (name) {
-  return !!await db.get('trustedAuthors')
-    .find({ name })
-    .value()
-}
-
+// maybe change all to cooldown rather than fubar for simplification
 async function cleanup() {
-  await db.get('trustedAuthors')
-    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
-    .write()
-
-  await db.get('fubarAuthors')
-    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
+  await db.get('authorCooldowns')
+    .remove(({ cooldownEnd }) => cooldownEnd < Date.now())
     .write()
 
   await db.get('fubarComments')
-    .remove(({ created }) => created < Date.now() - 1000 * 60 * 60 * 24)
+    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
     .write()
 
   await db.get('fubarPosts')
@@ -412,11 +492,29 @@ async function cleanup() {
 }
 
 const subreddits = [
+  'pcmasterrace',
+  'videos',
+  'AnimalsBeingBros',
+  'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'antiMLM',
+  'explainlikeimfive',
+  'StarWars',
+  'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
   'CODWarzone',
   'todayilearned',
   'OutOfTheLoop',
   'iamatotalpieceofshit',
   'BrandNewSentence',
+  'aww',
+  'memes',
   'madlads',
   'tifu',
   'HistoryMemes',
@@ -449,30 +547,13 @@ const subreddits = [
   'AskReddit',
   'nottheonion',
   'IAmA',
-  'pcmasterrace',
-  'videos',
-  'AnimalsBeingBros',
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'aww',
-  'gaming',
-  'food',
 ]
 
 ;(async function () {
   while (true) {
     try {
       const authors = uniqBy(
-        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }))).flat(),
+        (await asyncMapSerial(subreddits, (subreddit) => run({ subreddit }).catch(console.error))).flat(),
       )
       await run({ authors })
       await cleanup()
@@ -485,7 +566,7 @@ const subreddits = [
 
 // run({
 //   authors: [
-//     'deSuspect'
+//     'kevboomin'
 //   ],
 //   logTable: true,
 // })
