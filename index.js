@@ -224,15 +224,15 @@ async function groupCommentPairsByStatus(commentPairs) {
   const criteria = [
     {
       reason: 'tooOld',
-      test: asyncNot(isCommentTooOld),
+      test: isCommentTooOld,
     },
     {
       reason: 'broken',
-      test: asyncNot(isCommentFubar),
+      test: isCommentFubar,
     },
     {
       reason: 'alreadyResponded',
-      test: asyncNot(isAlreadyRespondedTo),
+      test: isAlreadyRespondedTo,
     },
   ]
 
@@ -526,10 +526,10 @@ const subreddits = [
 
 // run({
 //   authors: [
-//     'security123enjoy'
+//     'limestrong1'
 //   ],
 //   dryRun: true,
 //   // logTable: true,
 // })
-//
+
 module.exports = run
