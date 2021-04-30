@@ -34,7 +34,7 @@ async function asyncMapSerial(arr, cb) {
 async function asyncEvery(arr, cb) {
   return !await asyncFind(
     arr,
-    async (item) => !await cb(item)
+    async function () { return  !await cb(...arguments) }
   )
 }
 

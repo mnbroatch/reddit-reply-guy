@@ -105,18 +105,18 @@ function isSimilarToAncestor(comment, post) {
 }
 
 function findCommentPairsInPost(post) {
-  return asyncReduce(post.comments, async (acc, comment, i) => {
-    const copies = await findCommentCopies(comment, post, i)
+  return asyncReduce(post.comments, async (acc, comment) => {
+    const copies = await findCommentCopies(comment, post)
     const commentPairs = copies.map(copy => ({ original: comment, copy }))
     return [ ...acc, ...commentPairs ]
   }, [])
 }
 
 // startingIndex prevents double checks
-function findCommentCopies (original, post, startingIndex) {
+function findCommentCopies (original, post) {
   try {
     return asyncFilter(
-      post.comments.slice(startingIndex + 1),
+      post.comments,
       maybeCopy => asyncEvery(criteria, async (criterion, i) => {
         if (await criterion.test(maybeCopy, original, post)) {
           return true
@@ -137,6 +137,7 @@ function logCriterionFailure (criterion, maybeCopy, original, i) {
     console.log('~~~~~~~~~~~~~~~')
     console.log(`failed: ${criterion.description}`)
     console.log(`${maybeCopy.body.slice(0, 50)}${maybeCopy.body.length > 50 ? '...' : ''}`)
+    console.log(`${original.body.slice(0, 50)}${original.body.length > 50 ? '...' : ''}`)
     console.log('c.maybeCopy.author.name', maybeCopy.author.name)
     console.log(`http://reddit.com${maybeCopy.permalink}`)
     console.log(`http://reddit.com${original.permalink}`)

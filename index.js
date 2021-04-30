@@ -87,17 +87,17 @@ async function run ({
   if (subreddit) {
     console.log(`searching in /r/${subreddit}`)
   } else {
-    console.log(`searching ${authors?.length || 0} authors`)
+    console.log(`searching authors`)
   }
+
+  authors = authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit))
 
   // Filter is only an optimization, these authors' comments
   // could still be detected in others' retrieved posts.
-  authors = await asyncFilter(
-    authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit)),
-    asyncNot(isAuthorOnCooldown)
-  )
+  const activeAuthors = await asyncFilter(authors, asyncNot(isAuthorOnCooldown))
 
-  console.log(`investigating ${authors.length} suspected plagiarists:`)
+  console.log(`${authors.length - activeAuthors.length} authors on cooldown.`)
+  console.log(`Investigating ${authors.length} authors:`)
   authors.forEach((author) => { console.log(author) })
 
   const comments = uniqBy(
@@ -419,7 +419,7 @@ async function updateAuthorCooldown(name, copyCount = 0) {
   let cooldownEnd
   if (
     copyCount > MIN_PLAGIARIST_CASES
-    && copyCount !== maybeAuthor?.copyCount // not stale, count has changed
+    && copyCount > maybeAuthor?.copyCount // not stale, count has changed
   ) {
     cooldownEnd = now
   } else {
@@ -445,6 +445,33 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
+  'explainlikeimfive',
+  'StarWars',
+  'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
+  'CODWarzone',
+  'todayilearned',
+  'OutOfTheLoop',
+  'iamatotalpieceofshit',
+  'BrandNewSentence',
+  'aww',
+  'memes',
+  'madlads',
+  'tifu',
+  'HistoryMemes',
+  'gadgets',
+  'OldSchoolCool',
+  'Futurology',
+  'nextfuckinglevel',
+  'science',
+  'gardening',
+  'forbiddensnacks',
+  'Overwatch',
   'interestingasfuck',
   'relationships',
   'politics',
@@ -473,33 +500,6 @@ const subreddits = [
   'mildlyinteresting',
   'pics',
   'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'gaming',
-  'food',
-  'CODWarzone',
-  'todayilearned',
-  'OutOfTheLoop',
-  'iamatotalpieceofshit',
-  'BrandNewSentence',
-  'aww',
-  'memes',
-  'madlads',
-  'tifu',
-  'HistoryMemes',
-  'gadgets',
-  'OldSchoolCool',
-  'Futurology',
-  'nextfuckinglevel',
-  'science',
-  'gardening',
-  'forbiddensnacks',
-  'Overwatch',
 ]
 
 ;(async function () {
