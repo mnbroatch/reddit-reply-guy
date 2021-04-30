@@ -124,11 +124,9 @@ async function runAuthors (authors, dryRun) {
     asyncNot(isCommentFubar)
   )
 
-  console.log('comments.length', comments.length)
-
   const posts = await getPostsFromComments(comments)
 
-  console.log('posts.length', posts.length)
+  console.log(`Filtered out ${comments.length - posts.length} repetitive posts`)
 
   const commentPairsPerAuthor = Object.values(
     groupBy(
@@ -458,24 +456,6 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
-  'blog',
-  'europe',
-  'books',
-  'all',
-  'popular',
-  'fedex',
-  'AskReddit',
-  'nottheonion',
-  'IAmA',
-  'pcmasterrace',
-  'videos',
-  'AnimalsBeingBros',
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
   'cursedcomments',
   'gifs',
   'worldnews',
@@ -513,6 +493,24 @@ const subreddits = [
   'Genshin_Impact',
   'movies',
   'Art',
+  'blog',
+  'europe',
+  'books',
+  'all',
+  'popular',
+  'fedex',
+  'AskReddit',
+  'nottheonion',
+  'IAmA',
+  'pcmasterrace',
+  'videos',
+  'AnimalsBeingBros',
+  'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'antiMLM',
+  'explainlikeimfive',
+  'StarWars',
 ]
 
 ;(async function () {

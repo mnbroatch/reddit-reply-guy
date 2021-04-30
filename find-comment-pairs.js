@@ -14,6 +14,7 @@ const subredditWhitelist = [
   'FreeKarma4U',
   'Superstonk',
   '196',
+  'RandomActsOfGaming',
 ]
 
 const criteria = [
