@@ -1,6 +1,7 @@
 require('dotenv').config()
 const Snoowrap = require('snoowrap')
 const uniqBy = require('lodash/uniqBy')
+const chunk = require('lodash/chunk')
 const flatMap = require('lodash/flatMap')
 const groupBy = require('lodash/groupBy')
 const {
@@ -45,7 +46,7 @@ const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
 const INITIAL_POST_LIMIT = 15
 const AUTHOR_POST_LIMIT = 30
-const AUTHORS_CHUNK_SIZE = 5
+const AUTHORS_CHUNK_SIZE = 20
 const MIN_PLAGIARIST_CASES = 3
 
 const subredditsThatDisallowBots = [
@@ -92,35 +93,40 @@ async function run ({
 
   authors = authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit))
 
-  // Filter is only an optimization, these authors' comments
-  // could still be detected in others' retrieved posts.
   const activeAuthors = await asyncFilter(authors, asyncNot(isAuthorOnCooldown))
 
   console.log(`${authors.length - activeAuthors.length} authors on cooldown.`)
-  console.log(`Investigating ${authors.length} authors:`)
+  console.log(`Investigating ${activeAuthors.length} authors.`)
+
+  // Filter is only an optimization, these authors' comments
+  // could still be detected in others' retrieved posts.
+  const authorChunks = chunk(
+    activeAuthors,
+    AUTHORS_CHUNK_SIZE
+  )
+
+  return (await asyncMapSerial(
+    authorChunks,
+    authors => runAuthors(authors, dryRun)
+  )).flat()
+}
+
+async function runAuthors (authors, dryRun) {
+  console.log('-------------------------------')
+  console.log(`Investigating a chunk of ${authors.length} authors:`)
   authors.forEach((author) => { console.log(author) })
 
-  const comments = uniqBy(
-    await asyncFilter(
-      (await asyncMap(
-        authors,
-        getCommentsFromAuthor
-      )).flat(),
-      asyncNot(isCommentFubar)
-    ),
-    'id'
+  const comments = await asyncFilter(
+    (await asyncMap(
+      authors,
+      getCommentsFromAuthor
+    )).flat(),
+    asyncNot(isCommentFubar)
   )
 
-  const posts = uniqBy(
-    await asyncFilter(
-      await asyncMap(
-        comments,
-        getPostFromComment,
-      ),
-      asyncNot(isPostFubar)
-    ),
-    'id'
-  )
+  console.log('comments.length', comments.length)
+
+  const posts = await getPostsFromComments(comments)
 
   console.log('posts.length', posts.length)
 
@@ -185,17 +191,17 @@ async function run ({
   ))
 
   if (insufficientCommentPairsPerAuthor.length) {
-    console.log('-------------------------------')
+    console.log('----------------')
     console.log(`${insufficientCommentPairsPerAuthor.length} authors with insufficient plagiarism counts:`)
     insufficientCommentPairsPerAuthor.map(authorCommentPairs => authorCommentPairs[0].copy.author.name)
       .forEach((author) => { console.log(author) })
-    console.log('-------------------------------')
+    console.log('----------------')
   }
 
   sufficientCommentPairsByStatusPerAuthor.forEach(
     (commentPairsByStatus) => {
       const author = Object.values(commentPairsByStatus)[0][0].copy.author.name
-      console.log('-------------------------------')
+      console.log('----------------')
       console.log(`${author}: `)
       Object.entries(commentPairsByStatus).forEach(([status, authorCommentPairs]) => {
         if (status === 'viable') {
@@ -210,7 +216,7 @@ async function run ({
           console.log(`${authorCommentPairs.length} cases not processed for reason: ${status}`)
         }
       })
-      console.log('-------------------------------')
+      console.log('----------------')
     }
   )
 
@@ -317,12 +323,19 @@ async function getCommentsFromAuthor(author) {
   }
 }
 
-async function getPostFromComment(comment) {
-  const post = await getPost(comment.link_id)
-  // include starting comment in case we didn't receive it
-  return !post.comments.some(c => c.id === comment.id)
-    ? { ...post, comments: [ ...post.comments, comment ] }
-    : post
+async function getPostsFromComments(comments) {
+  const postIds = uniqBy(comments.map(comment => comment.link_id))
+  const posts = await asyncMap(postIds, getPost)
+
+  // be sure to include starting comments
+  return posts.map((post) => {
+    const commentsToReAdd = comments.filter(comment =>
+      comment.link_id === post.id
+      && !post.comments.some(c => c.id === comment.id)
+    )
+    return { ...post, comments: [ ...post.comments, ...commentsToReAdd ] }
+  })
+
 }
 
 function postReply(comment, message) {
@@ -445,6 +458,22 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
+  'blog',
+  'europe',
+  'books',
+  'all',
+  'popular',
+  'fedex',
+  'AskReddit',
+  'nottheonion',
+  'IAmA',
+  'pcmasterrace',
+  'videos',
+  'AnimalsBeingBros',
+  'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'antiMLM',
   'explainlikeimfive',
   'StarWars',
   'cursedcomments',
@@ -484,22 +513,6 @@ const subreddits = [
   'Genshin_Impact',
   'movies',
   'Art',
-  'blog',
-  'europe',
-  'books',
-  'all',
-  'popular',
-  'fedex',
-  'AskReddit',
-  'nottheonion',
-  'IAmA',
-  'pcmasterrace',
-  'videos',
-  'AnimalsBeingBros',
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
 ]
 
 ;(async function () {
