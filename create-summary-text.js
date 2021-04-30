@@ -30,7 +30,7 @@ function createReplyText (
 
   const additional = noLinks
     ? ''
-   : ` with [this](${additionalCases[0].copy.permalink}) comment which copies [this one](${additionalCases[0].original.permalink})`
+    : ` with [this](${additionalCases[0].copy.permalink}) comment which copies [this one](${additionalCases[0].original.permalink})`
 
   const username = noUsernameLinks
     ? 'the user above'
