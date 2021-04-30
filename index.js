@@ -419,7 +419,7 @@ async function updateAuthorCooldown(name, copyCount = 0) {
     cooldownEnd = now
   } else {
     cooldownEnd = maybeAuthor
-      ? now + Math.min((now - author.cooldownStart) * 2, 1000 * 60 * 60 * 24)
+      ? now + Math.min((now - maybeAuthor.cooldownStart) * 2, 1000 * 60 * 60 * 24)
       : now + 1000 * 60 * 60
   }
 
@@ -531,5 +531,5 @@ const subreddits = [
 //   dryRun: true,
 //   // logTable: true,
 // })
-
+//
 module.exports = run

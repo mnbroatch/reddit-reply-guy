@@ -55,16 +55,17 @@ async function addPostToFubarList(id) {
 
 async function addOrUpdateAuthorCooldown(name, cooldownStart, cooldownEnd, copyCount) {
   if (
-    !await db.get('authorCooldowns')
+    await db.get('authorCooldowns')
       .find({ name })
       .value()
   ) {
-    db.get('authorCooldowns')
-      .push({ name, cooldownStart, cooldownEnd, copyCount })
+    await db.get('authorCooldowns')
+      .find({ name })
+      .assign({ cooldownStart, cooldownEnd, copyCount })
       .write()
   } else {
-    db.get('authorCooldowns')
-      .assign({ name, cooldownStart, cooldownEnd, copyCount })
+    await db.get('authorCooldowns')
+      .push({ name, cooldownStart, cooldownEnd, copyCount })
       .write()
   }
 }
