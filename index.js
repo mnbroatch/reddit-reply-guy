@@ -39,6 +39,7 @@ const snoowrap = new Snoowrap({
 })
 snoowrap.config({ continueAfterRatelimitError: true })
 
+
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
@@ -140,8 +141,6 @@ async function run ({
     return !isRepetitive
   })
   // Filtering here is kinda ugly, let's hopefully improve one day.
-
-  // We will return newly-found, investigation-pending authors.
   const {
     commentPairsPerPendingAuthor = [],
     commentPairsPerInvestigatedAuthor = []
@@ -496,39 +495,39 @@ const subreddits = [
   'cursedcomments',
 ]
 
-;(async function () {
-  // const dryRun = false
-  const dryRun = true
-  while (true) {
-    try {
-      await asyncMapSerial(
-        subreddits,
-        async (subreddit) => {
-          try {
-            const authors = await run({ subreddit, dryRun })
-            if (authors.length) {
-              await run({ authors, dryRun })
-            }
-          } catch (e) {
-            console.error(`something went wrong:`)
-            console.error(e)
-          }
-        }
-      )
-      await cleanup()
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
-})()
+// ;(async function () {
+//   const dryRun = false
+//   // const dryRun = true
+//   while (true) {
+//     try {
+//       await asyncMapSerial(
+//         subreddits,
+//         async (subreddit) => {
+//           try {
+//             const authors = await run({ subreddit, dryRun })
+//             if (authors.length) {
+//               await run({ authors, dryRun })
+//             }
+//           } catch (e) {
+//             console.error(`something went wrong:`)
+//             console.error(e)
+//           }
+//         }
+//       )
+//       await cleanup()
+//     } catch (e) {
+//       console.error(`something went wrong:`)
+//       console.error(e)
+//     }
+//   }
+// })()
 
-// run({
-//   authors: [
-//     'security123enjoy'
-//   ],
-//   dryRun: true,
-//   // logTable: true,
-// })
+run({
+  authors: [
+    '_g550_'
+  ],
+  dryRun: true,
+  // logTable: true,
+})
 
 module.exports = run

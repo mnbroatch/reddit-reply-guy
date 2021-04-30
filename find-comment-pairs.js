@@ -1,5 +1,5 @@
 const compareTwoStrings = require('string-similarity').compareTwoStrings
-const { asyncMap, asyncFind, asyncEvery, asyncReduce } = require('./async-array-helpers')
+const { asyncMap, asyncFind, asyncEvery, asyncReduce, asyncFilter } = require('./async-array-helpers')
 
 const authorWhitelist = [
   'SaveVideo',
@@ -106,18 +106,18 @@ function isSimilarToAncestor(comment, post) {
 
 function findCommentPairsInPost(post) {
   return asyncReduce(post.comments, async (acc, comment, i) => {
-    const maybeCopy = await findCommentCopy(comment, post, i)
-    return maybeCopy
-      ? [ ...acc, { original: comment, copy: maybeCopy } ]
-      : acc
+    const copies = await findCommentCopies(comment, post, i)
+    const commentPairs = copies.map(copy => ({ original: comment, copy }))
+    return [ ...acc, ...commentPairs ]
   }, [])
 }
 
 // startingIndex prevents double checks
-function findCommentCopy (original, post, startingIndex) {
+function findCommentCopies (original, post, startingIndex) {
   try {
-    return asyncFind(post.comments.slice(startingIndex + 1), maybeCopy =>
-      asyncEvery(criteria, async (criterion, i) => {
+    return asyncFilter(
+      post.comments.slice(startingIndex + 1),
+      maybeCopy => asyncEvery(criteria, async (criterion, i) => {
         if (await criterion.test(maybeCopy, original, post)) {
           return true
         } else {
@@ -128,7 +128,7 @@ function findCommentCopy (original, post, startingIndex) {
     )
   } catch (e) {
     console.error(e)
-    return false
+    return []
   }
 }
 
