@@ -133,7 +133,7 @@ function findCommentCopies (original, post, startingIndex) {
 }
 
 function logCriterionFailure (criterion, maybeCopy, original, i) {
-  if (typeof process.env.VERBOSITY === 'number' && i > VERBOSITY) {
+  if (typeof process.env.VERBOSITY === 'number' && i > process.env.VERBOSITY) {
     console.log('~~~~~~~~~~~~~~~')
     console.log(`failed: ${criterion.description}`)
     console.log(`${maybeCopy.body.slice(0, 50)}${maybeCopy.body.length > 50 ? '...' : ''}`)

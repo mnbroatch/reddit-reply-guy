@@ -122,6 +122,8 @@ async function run ({
     'id'
   )
 
+  console.log('posts.length', posts.length)
+
   const commentPairsPerAuthor = Object.values(
     groupBy(
       uniqBy(
@@ -438,31 +440,6 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'gaming',
-  'food',
-  'CODWarzone',
-  'todayilearned',
-  'OutOfTheLoop',
-  'iamatotalpieceofshit',
-  'BrandNewSentence',
-  'aww',
-  'memes',
-  'madlads',
-  'tifu',
-  'HistoryMemes',
-  'gadgets',
-  'OldSchoolCool',
-  'Futurology',
-  'nextfuckinglevel',
-  'science',
-  'gardening',
-  'forbiddensnacks',
-  'Overwatch',
-  'interestingasfuck',
   'relationships',
   'politics',
   'instant_regret',
@@ -493,41 +470,67 @@ const subreddits = [
   'explainlikeimfive',
   'StarWars',
   'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
+  'CODWarzone',
+  'todayilearned',
+  'OutOfTheLoop',
+  'iamatotalpieceofshit',
+  'BrandNewSentence',
+  'aww',
+  'memes',
+  'madlads',
+  'tifu',
+  'HistoryMemes',
+  'gadgets',
+  'OldSchoolCool',
+  'Futurology',
+  'nextfuckinglevel',
+  'science',
+  'gardening',
+  'forbiddensnacks',
+  'Overwatch',
+  'interestingasfuck',
 ]
 
-// ;(async function () {
-//   const dryRun = false
-//   // const dryRun = true
-//   while (true) {
-//     try {
-//       await asyncMapSerial(
-//         subreddits,
-//         async (subreddit) => {
-//           try {
-//             const authors = await run({ subreddit, dryRun })
-//             if (authors.length) {
-//               await run({ authors, dryRun })
-//             }
-//           } catch (e) {
-//             console.error(`something went wrong:`)
-//             console.error(e)
-//           }
-//         }
-//       )
-//       await cleanup()
-//     } catch (e) {
-//       console.error(`something went wrong:`)
-//       console.error(e)
-//     }
-//   }
-// })()
+;(async function () {
+  const dryRun = false
+  // const dryRun = true
+  while (true) {
+    try {
+      await asyncMapSerial(
+        subreddits,
+        async (subreddit) => {
+          try {
+            const authors = await run({ subreddit, dryRun })
+            if (authors.length) {
+              await run({ authors, dryRun })
+            }
+          } catch (e) {
+            console.error(`something went wrong:`)
+            console.error(e)
+          }
+        }
+      )
+      await cleanup()
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
+})()
 
-run({
-  authors: [
-    '_g550_'
-  ],
-  dryRun: true,
-  // logTable: true,
-})
-
+// run({
+//   // authors: [
+//   //   '_g550_'
+//   // ],
+//   subreddit: 'memes',
+//   dryRun: true,
+//   // logTable: true,
+// })
+//
 module.exports = run
