@@ -173,7 +173,7 @@ async function run ({
     async authorCommentPairsByStatus => groupBy(
       await asyncMap(
         authorCommentPairsByStatus.viable,
-        async (commentPair) => processCommentPair(commentPair, authorCommentPairs, dryRun)
+        async (commentPair) => processCommentPair(commentPair, authorCommentPairsByStatus.viable, dryRun)
       ),
       'status'
     )
@@ -194,9 +194,9 @@ async function run ({
       console.log(`${author}: `)
       Object.entries(commentPairsByStatus).forEach(([status, authorCommentPairs]) => {
         if (status === 'viable') {
-          console.log(`${authorCommentPairs.length} processed: ${status}`)
+          console.log(`${authorCommentPairs.length} processed:`)
           const authorResults = processingResultsPerAuthor.find(
-            authorProcessingResults => authorProcessingResults[0].author === author
+            authorProcessingResultsByStatus => Object.values(authorProcessingResultsByStatus)[0][0].author === author
           )
           Object.entries(authorResults).forEach(([status, results]) => {
             console.log(`${results.length} cases processed with status: ${status}`)
@@ -244,9 +244,8 @@ async function groupCommentPairsByStatus(commentPairs) {
         key = (await asyncFind(
           criteria,
           (criterion) => criterion.test(commentPair.copy)
-        )).reason || 'viable'
+        ))?.reason || 'viable'
       } catch (e) {
-        console.error(e)
         key = 'broken'
         await addCommentToFubarList(commentPair.copy)
       }
@@ -440,7 +439,6 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
-  'cursedcomments',
   'gifs',
   'worldnews',
   'NatureIsFuckingLit',
@@ -495,11 +493,12 @@ const subreddits = [
   'antiMLM',
   'explainlikeimfive',
   'StarWars',
+  'cursedcomments',
 ]
 
 ;(async function () {
-  const dryRun = false
-  // const dryRun = true
+  // const dryRun = false
+  const dryRun = true
   while (true) {
     try {
       await asyncMapSerial(
@@ -526,7 +525,7 @@ const subreddits = [
 
 // run({
 //   authors: [
-//     'limestrong1'
+//     'security123enjoy'
 //   ],
 //   dryRun: true,
 //   // logTable: true,
