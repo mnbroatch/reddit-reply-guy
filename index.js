@@ -229,7 +229,11 @@ async function runAuthors (authors, dryRun) {
   await asyncMap( 
     commentPairsPerInvestigatedAuthor,
     authorCommentPairs => updateAuthorCooldown(authorCommentPairs[0].copy.author.name, authorCommentPairs.length)
+  )
 
+  await asyncMap( 
+    commentsPerRepetitiveAuthor,
+    authorComments => updateAuthorCooldown(authorComments[0].author.name)
   )
 
   // return authors we found along the way but didn't audit, so we can investigate further
