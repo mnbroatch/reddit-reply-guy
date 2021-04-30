@@ -375,7 +375,7 @@ async function processCommentPair (commentPair, authorCommentPairs, dryRun) {
   }
 
   let status
-  if (!shouldReply) {
+  if (dryRun) {
     status = 'dryRun'
   } else if (!shouldReply) {
     status = 'reportOnly'
@@ -498,7 +498,8 @@ const subreddits = [
 ]
 
 ;(async function () {
-  const dryRun = true
+  const dryRun = false
+  // const dryRun = true
   while (true) {
     try {
       await asyncMapSerial(
