@@ -116,17 +116,21 @@ async function runAuthors (authors, dryRun) {
   console.log(`Investigating a chunk of ${authors.length} authors:`)
   authors.forEach((author) => { console.log(author) })
 
+  const commentsPerAuthor = await asyncMap(authors, getCommentsFromAuthor)
+
+  const { commentsPerNonrepetitiveAuthor = [], commentsPerRepetitiveAuthor = [] } = groupBy(
+    commentsPerAuthor,
+    (authorComments) => isAuthorRepetitive(authorComments)
+      ? 'commentsPerRepetitiveAuthor'
+      : 'commentsPerNonrepetitiveAuthor'
+  )
+
   const comments = await asyncFilter(
-    (await asyncMap(
-      authors,
-      getCommentsFromAuthor
-    )).flat(),
+    commentsPerNonrepetitiveAuthor.flat(),
     asyncNot(isCommentFubar)
   )
 
   const posts = await getPostsFromComments(comments)
-
-  console.log(`Filtered out ${comments.length - posts.length} repetitive posts`)
 
   const commentPairsPerAuthor = Object.values(
     groupBy(
@@ -139,14 +143,8 @@ async function runAuthors (authors, dryRun) {
       ),
       'copy.author.name'
     )
-  ).filter(authorCommentPairs => {
-    const isRepetitive = isAuthorRepetitive(authorCommentPairs)
-    if (isRepetitive) {
-      console.log(`found a repetitive author: ${authorCommentPairs[0].copy.author.name}`)
-    }
-    return !isRepetitive
-  })
-  // Filtering here is kinda ugly, let's hopefully improve one day.
+  )
+
   const {
     commentPairsPerPendingAuthor = [],
     commentPairsPerInvestigatedAuthor = []
@@ -187,6 +185,14 @@ async function runAuthors (authors, dryRun) {
       'status'
     )
   ))
+
+  if (commentsPerRepetitiveAuthor.length) {
+    console.log('----------------')
+    console.log(`${commentsPerRepetitiveAuthor.length} repetitive authors:`)
+    commentsPerRepetitiveAuthor.map(authorComments => authorComments[0].author.name)
+      .forEach((author) => { console.log(author) })
+    console.log('----------------')
+  }
 
   if (insufficientCommentPairsPerAuthor.length) {
     console.log('----------------')
@@ -264,16 +270,22 @@ async function groupCommentPairsByStatus(commentPairs) {
   )
 }
 
-// The idea here is that a copy bot will not always post the same thing.
-// Inspired by some commenters that only ever post "sorry for your loss"
-// Half might be too generous, especially if bots catch on.
-function isAuthorRepetitive(authorCommentPairs) {
-  return authorCommentPairs.reduce((acc, commentPair) => {
-    const numSimilar = authorCommentPairs
-      .filter(c => c !== commentPair && isSimilar(c.copy.body, commentPair.copy.body))
-      .length
-    return numSimilar > acc ? numSimilar : acc
-  }, 0) > authorCommentPairs.length / 2
+// If an author posts the same thing a lot of the time
+// we will assume they are just boring.
+function isAuthorRepetitive(authorComments) {
+  // assuming transitivity is slightly wrong but ok for this.
+  // similarity threshold is low while I watch for false negatives
+  const similarBodyCounts = authorComments.reduce((acc, comment) => {
+    const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, .67))
+    return maybeKey
+      ? { ...acc, [maybeKey]: acc[maybeKey] + 1 }
+      : { ...acc, [comment.body]: 1 }
+  }, 0)
+
+  // How many comments are similar to others?
+  return Object.values(similarBodyCounts).reduce((acc, bodyCount) => {
+    return bodyCount > 1 ? acc + bodyCount : acc 
+  }, 0) > authorComments.length / 5
 }
 
 async function getInitialPosts(subreddit) {
@@ -456,11 +468,6 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
   'gaming',
   'food',
   'CODWarzone',
@@ -511,42 +518,47 @@ const subreddits = [
   'antiMLM',
   'explainlikeimfive',
   'StarWars',
+  'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
 ]
 
-;(async function () {
-  const dryRun = false
-  // const dryRun = true
-  while (true) {
-    try {
-      await asyncMapSerial(
-        subreddits,
-        async (subreddit) => {
-          try {
-            const authors = await run({ subreddit, dryRun })
-            if (authors.length) {
-              await run({ authors, dryRun })
-            }
-          } catch (e) {
-            console.error(`something went wrong:`)
-            console.error(e)
-          }
-        }
-      )
-      await cleanup()
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
-})()
+// ;(async function () {
+//   const dryRun = false
+//   // const dryRun = true
+//   while (true) {
+//     try {
+//       await asyncMapSerial(
+//         subreddits,
+//         async (subreddit) => {
+//           try {
+//             const authors = await run({ subreddit, dryRun })
+//             if (authors.length) {
+//               await run({ authors, dryRun })
+//             }
+//           } catch (e) {
+//             console.error(`something went wrong:`)
+//             console.error(e)
+//           }
+//         }
+//       )
+//       await cleanup()
+//     } catch (e) {
+//       console.error(`something went wrong:`)
+//       console.error(e)
+//     }
+//   }
+// })()
 
-// run({
-//   authors: [
-//     'Diamondhunter64'
-//   ],
-//   // subreddit: 'memes',
-//   dryRun: true,
-//   // logTable: true,
-// })
+run({
+  authors: [
+    '1gothickitten'
+  ],
+  dryRun: true,
+  // subreddit: 'memes',
+  // logTable: true,
+})
 
 module.exports = run

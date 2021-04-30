@@ -148,6 +148,6 @@ function logCriterionFailure (criterion, maybeCopy, original, i) {
 
 module.exports = { isSimilar, findCommentPairsInPost }
 
-function isSimilar(str1, str2) {
-  return compareTwoStrings(stripQuote(str1), stripQuote(str2)) > .97
+function isSimilar(str1, str2, threshold = .97) {
+  return compareTwoStrings(stripQuote(str1), stripQuote(str2)) > threshold
 }
