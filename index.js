@@ -174,7 +174,11 @@ async function run ({
     async authorCommentPairsByStatus => groupBy(
       await asyncMap(
         authorCommentPairsByStatus.viable,
-        async (commentPair) => processCommentPair(commentPair, authorCommentPairsByStatus.viable, dryRun)
+        async (commentPair) => processCommentPair(
+          commentPair,
+          commentPairsPerAuthor.find(authorCommentPairs => authorCommentPairs[0].copy.author.name === commentPair.copy.author.name),
+          dryRun
+        )
       ),
       'status'
     )
@@ -215,6 +219,7 @@ async function run ({
   await asyncMap( 
     commentPairsPerInvestigatedAuthor,
     authorCommentPairs => updateAuthorCooldown(authorCommentPairs[0].copy.author.name, authorCommentPairs.length)
+
   )
 
   // return authors we found along the way but didn't audit, so we can investigate further
@@ -440,6 +445,7 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
+  'interestingasfuck',
   'relationships',
   'politics',
   'instant_regret',
@@ -494,7 +500,6 @@ const subreddits = [
   'gardening',
   'forbiddensnacks',
   'Overwatch',
-  'interestingasfuck',
 ]
 
 ;(async function () {
@@ -525,12 +530,12 @@ const subreddits = [
 })()
 
 // run({
-//   // authors: [
-//   //   '_g550_'
-//   // ],
-//   subreddit: 'memes',
+//   authors: [
+//     'Diamondhunter64'
+//   ],
+//   // subreddit: 'memes',
 //   dryRun: true,
 //   // logTable: true,
 // })
-//
+
 module.exports = run
