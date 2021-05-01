@@ -84,53 +84,50 @@ async function run ({
   logTable,
   dryRun,
 }) {
-  console.log('===========================================')
-  if (subreddit) {
-    console.log(`searching in /r/${subreddit}`)
-  } else {
-    console.log(`searching authors`)
-  }
 
-  authors = authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit))
+  authors = authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit)),
+  // if we were feeling really thrifty we could save the initial posts we find plagiarists in
 
-  const activeAuthors = await asyncFilter(authors, asyncNot(isAuthorOnCooldown))
+  console.log(`searching ${Object.keys(data).length} authors`)
 
-  console.log(`${authors.length - activeAuthors.length} authors on cooldown.`)
-  console.log(`Investigating ${activeAuthors.length} authors.`)
+  const dataPerAuthor = authors.map((author) => ({ author, comments: [] }))
 
-  // Filter is only an optimization, these authors' comments
-  // could still be detected in others' retrieved posts.
-  const authorChunks = chunk(
-    activeAuthors,
-    AUTHORS_CHUNK_SIZE
+  const resultsPerAuthor 
+  let x =  await asyncMapSerial(
+    chunk(dataPerAuthor, AUTHORS_CHUNK_SIZE),
+    dataPerAuthorChunk => runAuthors(dataPerAuthorChunk, dryRun)
   )
 
-  return (await asyncMapSerial(
-    authorChunks,
-    authors => runAuthors(authors, dryRun)
-  )).flat()
+  // console.log('x', x)
+
+  return []
 }
 
-async function runAuthors (authors, dryRun) {
+async function runAuthors (dataPerAuthor, dryRun) {
   console.log('-------------------------------')
   console.log(`Investigating a chunk of ${authors.length} authors:`)
   authors.forEach((author) => { console.log(author) })
 
-  const commentsPerAuthor = await asyncMap(authors, getCommentsFromAuthor)
+  await tagAuthorsOnCooldown(dataPerAuthor)
 
-  const { commentsPerNonrepetitiveAuthor = [], commentsPerRepetitiveAuthor = [] } = groupBy(
-    commentsPerAuthor,
-    (authorComments) => isAuthorRepetitive(authorComments)
-      ? 'commentsPerRepetitiveAuthor'
-      : 'commentsPerNonrepetitiveAuthor'
+  const initialComments = await asyncReduce(
+    dataPerAuthor,
+    async (acc, authorData) => {
+      if (!authorData.failureReason) {
+        return [ ...acc, ...(await getCommentsFromAuthor(authorData.author)) ]
+      } else {
+        return acc
+      }
+    },
+    []
   )
 
-  const comments = await asyncFilter(
-    commentsPerNonrepetitiveAuthor.flat(),
-    asyncNot(isCommentFubar)
-  )
+  const posts = await getPostsFromComments(initialComments)
 
-  const posts = await getPostsFromComments(comments)
+
+
+  
+
 
   const commentPairsPerAuthor = Object.values(
     groupBy(
@@ -166,8 +163,18 @@ async function runAuthors (authors, dryRun) {
       : 'insufficientCommentPairsPerAuthor'
   )
 
-  const sufficientCommentPairsByStatusPerAuthor = await asyncMap(
+  const { sufficientCommentPairsPerNonrepetitiveAuthor = [], sufficientCommentPairsPerRepetitiveAuthor = [] } = groupBy(
     sufficientCommentPairsPerAuthor,
+    (authorCommentPairs) => {
+      const authorComments = commentsPerAuthor.find(ac => ac[0].author.name === authorCommentPairs[0].copy.author.name)
+      return isAuthorRepetitive(authorComments)
+        ? 'commentPairsPerRepetitiveAuthor'
+        : 'commentPairsPerNonrepetitiveAuthor'
+    }
+  )
+
+  const sufficientCommentPairsByStatusPerAuthor = await asyncMap(
+    sufficientCommentPairsPerNonrepetitiveAuthor,
     groupCommentPairsByStatus
   )
 
@@ -186,10 +193,10 @@ async function runAuthors (authors, dryRun) {
     )
   ))
 
-  if (commentsPerRepetitiveAuthor.length) {
+  if (sufficientCommentPairsPerRepetitiveAuthor.length) {
     console.log('----------------')
-    console.log(`${commentsPerRepetitiveAuthor.length} repetitive authors:`)
-    commentsPerRepetitiveAuthor.map(authorComments => authorComments[0].author.name)
+    console.log(`${sufficientCommentPairsPerRepetitiveAuthor.length} repetitive authors:`)
+    sufficientCommentPairsPerRepetitiveAuthor.map(authorCommentPairs => authorCommentPairs[0].copy.author.name)
       .forEach((author) => { console.log(author) })
     console.log('----------------')
   }
@@ -232,12 +239,56 @@ async function runAuthors (authors, dryRun) {
   )
 
   await asyncMap( 
-    commentsPerRepetitiveAuthor,
+    sufficientCommentPairsPerRepetitiveAuthor,
     authorComments => updateAuthorCooldown(authorComments[0].author.name)
   )
 
   // return authors we found along the way but didn't audit, so we can investigate further
   return commentPairsPerPendingAuthor.map(authorCommentPairs => authorCommentPairs[0].copy.author.name)
+}
+
+function tagFubarComments(data) {
+  await asyncMap(
+    dataPerAuthor,
+    async (authorData) => {
+      if (!authorData.failureReason) {
+        await asyncMap(
+          authorData.comments,
+          async comment => {
+            if (!comment.failureReason) {
+              if (await isAuthorOnCooldown(comment)) {
+                comment.failureReason = 'cooldown'
+              }
+            }
+          }
+        )
+      }
+    }
+  )
+}
+
+function addComments(data) {
+  await asyncMap(
+    dataPerAuthor,
+    async (authorData) => {
+      if (!authorData.failureReason) {
+        authorData.comments = await getCommentsFromAuthor(authorData.author)
+      }
+    }
+  )
+}
+
+async function tagAuthorsOnCooldown(dataPerAuthor) {
+  await asyncMap(
+    dataPerAuthor,
+    async (authorData) => {
+      if (!authorData.failureReason) {
+        if (await isAuthorOnCooldown(author)) {
+          authorData.failureReason = 'cooldown'
+        }
+      }
+    }
+  )
 }
 
 async function groupCommentPairsByStatus(commentPairs) {
@@ -555,10 +606,10 @@ const subreddits = [
 //     }
 //   }
 // })()
-
+//
 run({
   authors: [
-    '1gothickitten'
+    'TempestuousTrident'
   ],
   dryRun: true,
   // subreddit: 'memes',
