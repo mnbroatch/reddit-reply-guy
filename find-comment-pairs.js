@@ -107,10 +107,18 @@ function isSimilarToAncestor(comment, post) {
 
 function findCommentPairsInPost(post) {
   return asyncReduce(post.comments, async (acc, comment) => {
-    const copies = await findCommentCopies(comment, post)
-    const commentPairs = copies.map(copy => ({ original: comment, copy }))
+    const commentPairs = (await findCommentCopies(comment, post))
+      .map(copy => ({
+        original: formatComment(comment),
+        copy: formatComment(copy),
+        author: copy.author.name
+      }))
     return [ ...acc, ...commentPairs ]
   }, [])
+}
+
+function formatComment({ id, body, created, author, permalink, link_id }) {
+  return { id, body, created, author, permalink, link_id }
 }
 
 // startingIndex prevents double checks

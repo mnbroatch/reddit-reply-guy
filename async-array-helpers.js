@@ -1,3 +1,4 @@
+// TODO: error handling
 async function asyncReduce(arr, cb, initial = arr) {
   let acc = initial
   for (let i = 0, len = arr.length; i < len; i++) {

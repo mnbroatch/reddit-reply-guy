@@ -6,19 +6,12 @@ const db = low(adapter)
 db
   .defaults({
     fubarComments: [],
-    fubarPosts: [],
     authorCooldowns: [],
   })
   .write()
 
 async function isCommentFubar ({ id }) {
   return !!await db.get('fubarComments')
-    .find({ id })
-    .value()
-}
-
-async function isPostFubar ({ id }) {
-  return !!await db.get('fubarPosts')
     .find({ id })
     .value()
 }
@@ -36,18 +29,6 @@ async function addCommentToFubarList({ id }) {
       .value()
   ) {
     db.get('fubarComments')
-      .push({ id, processedAt: Date.now() })
-      .write()
-  }
-}
-
-async function addPostToFubarList(id) {
-  if (
-    !await db.get('fubarPosts')
-      .find({ id })
-      .value()
-  ) {
-    db.get('fubarPosts')
       .push({ id, processedAt: Date.now() })
       .write()
   }
@@ -79,18 +60,12 @@ async function cleanup() {
   await db.get('fubarComments')
     .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
     .write()
-
-  await db.get('fubarPosts')
-    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
-    .write()
 }
 
 module.exports = {
   isCommentFubar,
-  isPostFubar,
   getAuthorCooldown,
   addCommentToFubarList,
-  addPostToFubarList,
   addOrUpdateAuthorCooldown,
   cleanup,
 }
