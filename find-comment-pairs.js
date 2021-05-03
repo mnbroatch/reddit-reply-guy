@@ -117,8 +117,31 @@ function findCommentPairsInPost(post) {
   }, [])
 }
 
-function formatComment({ id, body, created, author, permalink, link_id }) {
-  return { id, body, created, author, permalink, link_id }
+function formatComment({
+  id,
+  body,
+  created,
+  author,
+  permalink,
+  link_id,
+  subreddit,
+  locked,
+  replies = []
+}) {
+  if (locked) {
+    console.log('lockarooney')
+  }
+  return {
+    id,
+    body,
+    created,
+    author,
+    permalink,
+    link_id,
+    subreddit,
+    locked,
+    replies: [ ...replies.map(({author_fullname}) => ({ author_fullname })) ]
+  }
 }
 
 // startingIndex prevents double checks
