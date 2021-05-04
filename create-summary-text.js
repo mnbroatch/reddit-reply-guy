@@ -47,7 +47,7 @@ beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be ba
 function createTable (commentPairs) {
   return `Original | Plagiarized\n-------- | -----------`
     + commentPairs.reduce((acc, commentPair) =>
-        acc + `\n[${commentPair.original.permalink}](${commentPair.original.permalink}) | [${commentPair.copy.permalink}](${commentPair.copy.permalink})`
+        acc + `\n[${commentPair.original.id}](${commentPair.original.permalink}) | [${commentPair.copy.id}](${commentPair.copy.permalink})`
       , '')
 }
 

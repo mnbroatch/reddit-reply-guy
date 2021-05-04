@@ -58,7 +58,7 @@ async function cleanup() {
     .write()
 
   await db.get('fubarComments')
-    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24)
+    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24 * 3)
     .write()
 }
 

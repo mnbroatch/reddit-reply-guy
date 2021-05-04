@@ -117,8 +117,10 @@ function findCommentPairsInPost(post) {
   }, [])
 }
 
-function formatComment({
+// Subject to breaking if assumptions about snoowrap internals become untrue
+function formatComment( {
   id,
+  name,
   body,
   created,
   author,
@@ -126,13 +128,18 @@ function formatComment({
   link_id,
   subreddit,
   locked,
-  replies = []
+  replies = [],
+  reply,
+  report,
+  _r,
+  _post,
 }) {
   if (locked) {
     console.log('lockarooney')
   }
   return {
     id,
+    name,
     body,
     created,
     author,
@@ -140,7 +147,11 @@ function formatComment({
     link_id,
     subreddit,
     locked,
-    replies: [ ...replies.map(({author_fullname}) => ({ author_fullname })) ]
+    replies: [ ...replies.map(({ author_fullname }) => ({ author_fullname })) ],
+    reply,
+    report,
+    _r,
+    _post,
   }
 }
 

@@ -79,32 +79,53 @@ const fubarCommentIds = []
 
 async function run ({
   subreddit,
-  authors,
+  authors = [],
   logTable,
   dryRun,
+  initialCommentPairs = [],
 }) {
   console.log('==================================================')
   console.log(`subreddit: ${subreddit || 'none'}`)
 
-  authors = authors || await getPlagiaristsFromPosts(await getInitialPosts(subreddit))
-  // if we were feeling really thrifty we could save the initial posts we find plagiarists in
-  console.log('authors', authors)
-
-  const authorsData = await asyncMap(
-    authors,
-    async (author) => ({
-      author,
-      comments: [],
-      commentPairs: [],
-      failureReason: null
-    })
+  const commentPairs = uniqBy(
+    [
+      ...initialCommentPairs.map(commentPair => ({ ...commentPair, failureReason: null })),
+      ...(subreddit ? await findCommentPairsInSubreddit(subreddit) : [])
+    ],
+    'copy.id'
   )
+
+  const authorsData = Object.entries(groupBy(commentPairs, 'author'))
+    .reduce((acc, [author, authorCommentPairs]) => [
+      ...acc,
+      {
+        author,
+        comments: [],
+        commentPairs: authorCommentPairs,
+        failureReason: null
+      }
+    ], [])
+
+  authors.forEach((author) => {
+    if (!authorsData.some(authorData => authorData.author === author)) {
+      authorsData.push({
+        author,
+        comments: [],
+        commentPairs: [],
+        failureReason: null
+      })
+    }
+  })
 
   try {
     await tagAuthorsOnCooldown(authorsData)
-    await fetchAndAddComments(authorsData)
+    await fetchAndAddComments(authorsData) // maybe strip these
     await tagRepetitiveAuthors(authorsData)
+    await tagFubarComments(authorsData)
     await findAndAddCommentPairs(authorsData)
+    if (logTable) {
+      logTables(authorsData)
+    }
     await tagAuthorsWithInsufficientEvidence(authorsData)
     await tagTooOldCommentPairs(authorsData)
     await tagFubarCommentPairs(authorsData)
@@ -113,7 +134,7 @@ async function run ({
     await tagNoReplyCommentPairs(authorsData)
     if (!dryRun) {
       await replyToCommentPairs(authorsData)
-      // await reportCommentPairs(authorsData)
+      await reportCommentPairs(authorsData)
     }
     await updateAuthorCooldowns(authorsData)
     await updateCommentCooldowns(authorsData)
@@ -150,7 +171,8 @@ async function run ({
 
   return authorsData
     .filter(authorData => authorData.failureReason === 'newlySpotted')
-    .map(authorData => authorData.author)
+    .map(authorData => authorData.commentPairs)
+    .flat()
 }
 
 // rethink this, too tightly coupled with main function
@@ -216,40 +238,64 @@ async function findAndAddCommentPairs(authorsData) {
       async (comment) => {
         try {
           return findCommentPairsInPost(await getPost(comment.link_id))
-        } catch {
+        } catch (e) {
           console.error(e.message)
           console.error(`Could not get post: ${comment.link_id}`)
-          addCommentToFubarList(comment)
+          await addCommentToFubarList(comment)
           return []
         }
       }
     )
   )).flat().flat()
 
-  const commentPairsByAuthor = groupBy(
-    commentPairs,
-    'author'
-  )
-
-  Object.entries(commentPairsByAuthor).forEach(([ author, authorCommentPairs ]) => {
-    const authorData = authorsData.find(data => data.author === author)
-    if (authorData) {
-      authorData.commentPairs = uniqBy([ ...authorData.commentPairs, ...authorCommentPairs ], 'copy.id')
-    } else {
-      authorsData.push({
-        author,
-        comments: [],
-        commentPairs: [],
-        failureReason: 'newlySpotted'
-      })
-    }
-  })
+  Object.entries(groupBy(commentPairs, 'author'))
+    .forEach(([ author, authorCommentPairs ]) => {
+      const authorData = authorsData.find(data => data.author === author)
+      if (authorData) {
+        authorData.commentPairs = uniqBy([ ...authorData.commentPairs, ...authorCommentPairs ], 'copy.id')
+      } else {
+        authorsData.push({
+          author,
+          comments: [],
+          commentPairs: commentPairs
+            .map(commentPair => ({
+              ...commentPair,
+              failureReason: 'newlySpotted'
+            })),
+          failureReason: 'newlySpotted'
+        })
+      }
+    })
 }
 
 async function fetchAndAddComments(authorsData) {
   await asyncMap(authorsData, async (authorData) => {
     if (!authorData.failureReason) {
       authorData.comments = await getCommentsFromAuthor(authorData.author)
+    }
+  })
+}
+
+async function tagFubarComments(authorsData) {
+  await asyncMap(authorsData, async (authorData) => {
+    if (!authorData.failureReason) {
+      await asyncMap(authorData.comment, async (comment) => {
+        if (!comment.failureReason && await isCommentFubar(comment)) {
+          comment.failureReason = 'commentCooldown'
+        }
+      })
+    }
+  })
+}
+
+async function tagTooOldCommentPairs(authorsData) {
+  await asyncMap(authorsData, async (authorData) => {
+    if (!authorData.failureReason) {
+      await asyncMap(authorData.commentPairs, async (commentPair) => {
+        if (!commentPair.failureReason && await isCommentTooOld(commentPair.copy)) {
+          commentPair.failureReason = 'tooOld'
+        }
+      })
     }
   })
 }
@@ -278,24 +324,21 @@ async function tagAuthorsWithInsufficientEvidence(authorsData) {
   })
 }
 
+async function logTables (authorsData) {
+  await asyncMap(authorsData, async (authorData) => {
+    if (authorData.commentPairs.length) {
+      console.log('----------------------------------')
+      console.log(createTable(authorData.commentPairs))
+    }
+  })
+}
+
 async function tagFubarCommentPairs(authorsData) {
   await asyncMap(authorsData, async (authorData) => {
     if (!authorData.failureReason) {
       await asyncMap(authorData.commentPairs, async (commentPair) => {
         if (!commentPair.failureReason && await isCommentFubar(commentPair.copy)) {
           commentPair.failureReason = 'commentCooldown'
-        }
-      })
-    }
-  })
-}
-
-async function tagTooOldCommentPairs(authorsData) {
-  await asyncMap(authorsData, async (authorData) => {
-    if (!authorData.failureReason) {
-      await asyncMap(authorData.commentPairs, async (commentPair) => {
-        if (!commentPair.failureReason && await isCommentTooOld(commentPair.copy)) {
-          commentPair.failureReason = 'tooOld'
         }
       })
     }
@@ -349,7 +392,7 @@ async function replyToCommentPairs (authorsData) {
         if (!commentPair.failureReason && !commentPair.noReply) {
           let response
           try {
-            response = await snoowrap.getComment(commentPair.copy.id).reply(createReplyText(commentPair))
+            response = await commentPair.copy.reply(createReplyText(commentPair))
           } catch (e) {
             console.error(e)
             commentPair.failureReason = 'broken'
@@ -359,10 +402,10 @@ async function replyToCommentPairs (authorsData) {
             await new Promise((resolve, reject) => {
               setTimeout(async () => {
                 try {
-                  const x = await isCommentAlreadyRepliedTo(commentPair.copy, true)
-                  if (!x) throw new Error('asdasdasd')
+                  if (!await isCommentAlreadyRepliedTo(commentPair.copy, true)) {
+                    throw new Error()
+                  }
                 } catch (e) {
-                  console.error(e)
                   commentPair.failureReason = 'broken'
                   console.error(`bot reply not retrieved on: http://reddit.com${commentPair.copy.permalink}`)
                 }
@@ -385,7 +428,7 @@ async function reportCommentPairs (authorsData) {
             await commentPair.copy.report({ reason: createReplyText(commentPair) })
           } catch (e) {
             commentPair.failureReason = 'broken'
-            console.error(`Couldn't report comment: http://reddit.com${comment.permalink}`)
+            console.error(`Couldn't report comment: http://reddit.com${commentPair.copy.permalink}`)
           }
         }
       })
@@ -473,11 +516,11 @@ async function isCommentAlreadyRepliedTo(comment, refresh) {
   return replies.some(reply => reply.author_fullname === BOT_USER_ID)
 }
 
-async function getPlagiaristsFromPosts(posts) {
-  return uniqBy(
-    (await asyncMap(posts, findCommentPairsInPost)).flat(),
-    'copy.author.name'
-  ).map(commentPair => commentPair.author)
+async function findCommentPairsInSubreddit (subreddit) {
+  return (await asyncMap(
+    await getInitialPosts(subreddit),
+    findCommentPairsInPost
+  )).flat()
 }
 
 async function updateAuthorCooldown(name, copyCount = 0) {
@@ -514,21 +557,6 @@ async function isAuthorOnCooldown (author) {
 }
 
 const subreddits = [
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'gaming',
-  'food',
-  'CODWarzone',
-  'todayilearned',
-  'OutOfTheLoop',
   'iamatotalpieceofshit',
   'BrandNewSentence',
   'aww',
@@ -540,18 +568,18 @@ const subreddits = [
   'OldSchoolCool',
   'Futurology',
   'nextfuckinglevel',
-  'science',
   'gardening',
   'forbiddensnacks',
   'Overwatch',
   'interestingasfuck',
   'relationships',
   'politics',
-  'instant_regret',
   'leagueoflegends',
   'Tinder',
   'news',
   'cats',
+  'instant_regret',
+  'science',
   'Music',
   'Genshin_Impact',
   'movies',
@@ -569,6 +597,21 @@ const subreddits = [
   'videos',
   'AnimalsBeingBros',
   'funnyvideos',
+  'mildlyinteresting',
+  'pics',
+  'antiMLM',
+  'explainlikeimfive',
+  'StarWars',
+  'cursedcomments',
+  'gifs',
+  'worldnews',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
+  'CODWarzone',
+  'todayilearned',
+  'OutOfTheLoop',
 ]
 
 ;(async function () {
@@ -582,9 +625,9 @@ const subreddits = [
         subreddits,
         async (subreddit) => {
           try {
-            const authors = await run({ subreddit, dryRun })
-            if (authors.length) {
-              await run({ authors, dryRun })
+            const initialCommentPairs = await run({ subreddit, dryRun })
+            if (initialCommentPairs.length) {
+              await run({ initialCommentPairs, dryRun })
             }
           } catch (e) {
             console.error(`something went wrong:`)
@@ -600,11 +643,11 @@ const subreddits = [
 
   // run({
   //   authors: [
-  //     'Nithya12M'
+  //     'MorganButtler'
   //   ],
   //   // dryRun: true,
-  //   // subreddit: 'memes',
   //   // logTable: true,
+  //   // subreddit: 'memes',
   // })
 
 })()
