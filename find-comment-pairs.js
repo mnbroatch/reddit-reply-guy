@@ -111,7 +111,8 @@ function findCommentPairsInPost(post) {
       .map(copy => ({
         original: formatComment(comment),
         copy: formatComment(copy),
-        author: copy.author.name
+        author: copy.author.name,
+        failureReason: null,
       }))
     return [ ...acc, ...commentPairs ]
   }, [])

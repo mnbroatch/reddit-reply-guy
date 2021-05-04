@@ -55,12 +55,6 @@ async function asyncFilter (arr, cb) {
   .filter(Boolean)
 }
 
-function asyncNot (cb) {
-  return async function () {
-    return !await cb(...arguments)
-  }
-}
-
 module.exports = {
   asyncFind,
   asyncEvery,
@@ -69,5 +63,4 @@ module.exports = {
   asyncMapSerial,
   asyncFilter,
   asyncReduce,
-  asyncNot,
 }
