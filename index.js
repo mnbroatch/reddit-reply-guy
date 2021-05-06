@@ -42,8 +42,8 @@ snoowrap.config({ continueAfterRatelimitError: true })
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
-const INITIAL_POST_LIMIT = 10
-const AUTHOR_POST_LIMIT = 20
+const INITIAL_POST_LIMIT = 20
+const AUTHOR_POST_LIMIT = 30
 const POST_CHUNK_SIZE = 5
 const MIN_PLAGIARIST_CASES = 3
 
@@ -70,6 +70,7 @@ const subredditsThatDisallowBots = [
   'IAmA',
   'todayilearned',
   'sports',
+  'politics',
 ]
 
 // Some posts simply won't return /u/reply-guy-bot comments for seemingly no reason.
@@ -121,7 +122,10 @@ async function run ({
     await fetchAndAddComments(authorsData) // maybe strip these
     await tagRepetitiveAuthors(authorsData)
     await tagFubarComments(authorsData)
+
     await findAndAddCommentPairs(authorsData)
+    // could fetch more comments by guilty authors here
+
     await tagAuthorsWithInsufficientEvidence(authorsData)
     await updateAuthorCooldowns(authorsData)
 
@@ -132,7 +136,9 @@ async function run ({
     await traverseCommentPairs(
       authorsData,
       async (commentPair, authorCommentPairs) => {
+        // tags are largely for reporting at the end
         if (commentPair.failureReason) {
+          // shouldn't ever get here
           console.log('commentPair.failureReason', commentPair.failureReason)
         } else if (isCommentTooOld(commentPair.copy)) {
           commentPair.failureReason = 'tooOld'
@@ -140,15 +146,11 @@ async function run ({
           commentPair.failureReason = 'commentCooldown'
         } else if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
           commentPair.failureReason = 'alreadyReplied'
+        } else if (!shouldReply(commentPair)) {
+          commentPair.noReply = true
         }
 
-        if (!dryRun) {
-          if (subredditsThatDisallowBots.some(
-              subreddit => subreddit.toLowerCase() === commentPair.copy.subreddit.display_name.toLowerCase()
-          )) {
-            commentPair.noReply = true
-          }
-
+        if (!dryRun && !commentPair.failureReason) {
           commentPair.additional = authorCommentPairs.filter(c => commentPair !== c)
           await reportCommentPair(commentPair)
           if (!commentPair.noReply) {
@@ -191,6 +193,11 @@ async function run ({
 
         Object.entries(groupBy(failed, 'failureReason')).forEach(([ failureReason, commentPairs ]) => {
             console.log(`${failureReason}: ${commentPairs.length}`)
+            if (failureReason === 'broken') {
+              commentPairs.forEach((commentPair) => {
+                console.log(`http://reddit.com${commentPair.permalink}`)
+              })
+            }
         })
       }
     })
@@ -216,15 +223,11 @@ async function findAndAddCommentPairs(authorsData) {
   const commentsToSearch = uniqBy(await asyncReduce(
     authorsData,
     async (acc, authorData) => {
-      if (!authorData.failureReason) {
-        return [
-          ...acc,
-          ...authorData.comments
-            .filter(comment => !comment.failureReason)
-        ]
-      } else {
-        return acc
-      }
+      return [
+        ...acc,
+        ...authorData.comments
+          .filter(comment => !authorData.author.failureReason && !comment.failureReason)
+      ]
     },
     []
   ))
@@ -255,7 +258,7 @@ async function findAndAddCommentPairs(authorsData) {
         authorsData.push({
           author,
           comments: [],
-          commentPairs: commentPairs
+          commentPairs: authorCommentPairs
             .map(commentPair => ({
               ...commentPair,
               failureReason: 'newlySpotted'
@@ -310,11 +313,11 @@ async function tagAuthorsWithInsufficientEvidence(authorsData) {
   })
 }
 
-async function traverseCommentPairs(authorsData, cb, includeFailedComents) {
+async function traverseCommentPairs(authorsData, cb) {
   await asyncMap(authorsData, async (authorData) => {
     if (!authorData.failureReason) {
       await asyncMap(authorData.commentPairs, async (commentPair) => {
-        if (includeFailedComents || !commentPair.failureReason) {
+        if (!commentPair.failureReason) {
           await cb(commentPair, authorData.commentPairs)
         }
       })
@@ -328,7 +331,6 @@ async function replyToCommentPair (commentPair) {
     try {
       response = await commentPair.copy.reply(createReplyText(commentPair))
     } catch (e) {
-      console.error(e)
       commentPair.failureReason = 'broken'
       console.error(`couldn't post reply to: http://reddit.com${commentPair.copy.permalink}`)
     }
@@ -360,9 +362,10 @@ async function reportCommentPair (commentPair) {
 }
 
 async function logTables (authorsData) {
-  authorData.map((authorData) => {
+  authorsData.forEach((authorData) => {
     if (authorData.commentPairs.length) {
       console.log('----------------------------------')
+      console.log('authorData.author', authorData.author)
       console.log(createTable(authorData.commentPairs))
     }
   })
@@ -400,15 +403,7 @@ async function getInitialPosts(subreddit) {
 async function getPost (postId) {
   const post = await snoowrap.getSubmission(postId)
 
-  // snoowrap api is in a weird state where dupes show up under "comments".
-  // They don't show up with comments so we need to getSubmission them -_-
-  // https://github.com/not-an-aardvark/snoowrap/issues/320
-  const duplicates = await asyncMap(
-    await post.num_duplicates
-      ? await post.getDuplicates().comments 
-      : [],
-    async (dupe) => snoowrap.getSubmission(await dupe.id)
-  )
+  const duplicates = await getDuplicatePosts(post)
 
   const comments = (await asyncMap(
     [ post, ...duplicates ],
@@ -419,6 +414,23 @@ async function getPost (postId) {
     id: await post.id,
     comments
   }
+}
+
+// have to use this because getDuplicates doesn't
+// return removed submissions
+async function getDuplicatePosts(post) {
+  const duplicatesMetaData = (await snoowrap.oauthRequest({
+    uri: '/api/info',
+    method: 'get',
+    qs: {
+      url: await post.url,
+    }
+  }))
+
+  return asyncMap(
+    await asyncFilter(duplicatesMetaData, async dupeMeta => await dupeMeta.id !== await post.id),
+    async (dupeMeta) => snoowrap.getSubmission(await dupeMeta.id)
+  )
 }
 
 function flattenReplies(comments) {
@@ -488,11 +500,30 @@ async function isAuthorOnCooldown (author) {
   return (await getAuthorCooldown(author))?.cooldownEnd > Date.now()
 }
 
+function shouldReply (commentPair) {
+  return !subredditsThatDisallowBots.some(
+    subreddit => subreddit.toLowerCase() === commentPair.copy.subreddit.display_name.toLowerCase()
+  )
+}
+
+
 const subreddits = [
-  'iamatotalpieceofshit',
-  'BrandNewSentence',
-  'aww',
-  'memes',
+  'nonononoyes',
+  'ShowerThoughts',
+  'LifeProTips',
+  'all',
+  'popular',
+  'AskReddit',
+  'pcmasterrace',
+  'videos',
+  'mildlyinteresting',
+  'pics',
+  'gifs',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
+  'todayilearned',
   'madlads',
   'tifu',
   'HistoryMemes',
@@ -517,70 +548,48 @@ const subreddits = [
   'movies',
   'Art',
   'blog',
-  'europe',
-  'books',
-  'all',
-  'popular',
-  'fedex',
-  'AskReddit',
-  'nottheonion',
-  'IAmA',
-  'pcmasterrace',
-  'videos',
-  'AnimalsBeingBros',
-  'funnyvideos',
-  'mildlyinteresting',
-  'pics',
-  'antiMLM',
-  'explainlikeimfive',
-  'StarWars',
-  'cursedcomments',
-  'gifs',
-  'worldnews',
-  'NatureIsFuckingLit',
-  'funny',
-  'gaming',
-  'food',
-  'CODWarzone',
-  'todayilearned',
-  'OutOfTheLoop',
+  'aww',
+  'memes',
+  'DIY',
+  'reverseanimalrescue',
+  'dataisbeautiful',
 ]
 
 ;(async function () {
 
-  // const dryRun = false
-  // // const dryRun = true
-  // while (true) {
-  //   try {
-  //     await cleanup()
-  //     await asyncMapSerial(
-  //       subreddits,
-  //       async (subreddit) => {
-  //         try {
-  //           const initialCommentPairs = await run({ subreddit, dryRun })
-  //           if (initialCommentPairs.length) {
-  //             await run({ initialCommentPairs, dryRun })
-  //           }
-  //         } catch (e) {
-  //           console.error(`something went wrong:`)
-  //           console.error(e)
-  //         }
-  //       }
-  //     )
-  //   } catch (e) {
-  //     console.error(`something went wrong:`)
-  //     console.error(e)
-  //   }
-  // }
+  const dryRun = false
+  // const dryRun = true
+  while (true) {
+    try {
+      await cleanup()
+      await asyncMapSerial(
+        subreddits,
+        async (subreddit) => {
+          try {
+            const initialCommentPairs = await run({ subreddit, dryRun })
+            if (initialCommentPairs.length) {
+              await run({ initialCommentPairs, dryRun })
+            }
+          } catch (e) {
+            console.error(`something went wrong:`)
+            console.error(e)
+          }
+        }
+      )
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
 
-  run({
-    authors: [
-      'shmeg2111l0'
-    ],
-    dryRun: true,
-    // logTable: true,
-    // subreddit: 'memes',
-  })
+  // run({
+  //   authors: [
+  //     'gfxguyfghrdtg5690',
+  //   ],
+  //   dryRun: true,
+  //   logTable: true,
+  //   // subreddit: 'memes',
+  // })
 
 })()
 
