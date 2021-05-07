@@ -49,10 +49,15 @@ beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be ba
 function createTable (commentPairs) {
   return `Original | Plagiarized\n-------- | -----------`
     + commentPairs.reduce((acc, commentPair) =>
-      acc + `\n[${commentPair.original.id}](http://np.reddit.com${commentPair.original.permalink}) | [${commentPair.copy.id}](http://np.reddit.com${commentPair.copy.permalink})`
+      acc + `\n[${truncate(commentPair.original.body)}](http://np.reddit.com${commentPair.original.permalink}) | [${truncate(commentPair.copy.body)}](http://np.reddit.com${commentPair.copy.permalink})`
       , '')
 }
 
+function truncate(body) {
+  return body.length <= 30
+    ? body.slice(0, 30) + '...'
+    : body
+}
 
 module.exports = {
   createReplyText,
