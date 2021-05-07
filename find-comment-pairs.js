@@ -2,6 +2,8 @@ const compareTwoStrings = require('string-similarity').compareTwoStrings
 const { asyncMap, asyncFind, asyncEvery, asyncReduce, asyncFilter } = require('./async-array-helpers')
 
 const authorWhitelist = [
+  'worldmobilemod',
+  'WMTmod',
   'SaveVideo',
   'savevideobot',
   'Quoterm',
@@ -180,8 +182,6 @@ function findCommentCopies (original, post) {
 function logCriterionFailure (criterion, maybeCopy, original, i) {
   if (typeof process.env.VERBOSITY === 'number' && i > process.env.VERBOSITY) {
     console.log('~~~~~~~~~~~~~~~')
-    budingetyutyu567
-
     console.log(`failed: ${criterion.description}`)
     console.log(`${maybeCopy.body.slice(0, 50)}${maybeCopy.body.length > 50 ? '...' : ''}`)
     console.log(`${original.body.slice(0, 50)}${original.body.length > 50 ? '...' : ''}`)
@@ -196,5 +196,5 @@ function isSimilar(str1, str2, threshold = .97) {
   return compareTwoStrings(stripBody(str1), stripBody(str2)) > threshold
 }
 
-module.exports = { isSimilar, findCommentPairsInPost, stripComment }
+module.exports = { isSimilar, findCommentPairsInPost }
 

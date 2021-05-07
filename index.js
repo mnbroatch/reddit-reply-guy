@@ -8,7 +8,6 @@ const groupBy = require('lodash/groupBy')
 const {
   findCommentPairsInPost,
   isSimilar,
-  stripComment,
 } = require('./find-comment-pairs')
 const {
   createReplyText,
@@ -51,6 +50,7 @@ const MAX_COMMENT_AGE = 1000 * 60 * 60 * 24 * 3
 const INITIAL_COOLDOWN = 1000 * 60 * 60
 
 const subredditsThatDisallowBots = [
+  'Futurology',
   'Gaming',
   'WTF',
   'memes',

@@ -2,6 +2,7 @@ const low = require('lowdb')
 const FileSync = require('lowdb/adapters/FileSync')
 const adapter = new FileSync('db/db.json')
 const db = low(adapter)
+const { asyncMap } = require('./async-array-helpers')
 
 db
   .defaults({
@@ -39,7 +40,7 @@ async function addOrUpdateAuthorCooldown({ name, cooldownStart, cooldownEnd, cop
   }
 }
 
-async function addOrUpdateCopyCooldown({ name, cooldownStart, cooldownEnd }) {
+async function addOrUpdateCommentCooldown({ name, cooldownStart, cooldownEnd }) {
   if (
     await db.get('commentCooldowns')
       .find({ name })
@@ -57,7 +58,7 @@ async function addOrUpdateCopyCooldown({ name, cooldownStart, cooldownEnd }) {
 }
 
 async function cleanup(maxCommentAge) {
-  asyncMap(
+  await asyncMap(
     [ 'authorCooldowns', 'commentCooldowns' ],
     async (commentType) => {
       await db.get(commentType)
