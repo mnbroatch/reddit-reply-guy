@@ -528,6 +528,16 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
+  'aww',
+  'memes',
+  'DIY',
+  'reverseanimalrescue',
+  'dataisbeautiful',
+  'nonononoyes',
+  'ShowerThoughts',
+  'LifeProTips',
+  'all',
+  'popular',
   'AskReddit',
   'pcmasterrace',
   'videos',
@@ -563,16 +573,6 @@ const subreddits = [
   'movies',
   'Art',
   'blog',
-  'aww',
-  'memes',
-  'DIY',
-  'reverseanimalrescue',
-  'dataisbeautiful',
-  'nonononoyes',
-  'ShowerThoughts',
-  'LifeProTips',
-  'all',
-  'popular',
 ]
 
 ;(async function () {

@@ -19,7 +19,7 @@ function createReplyText (commentPair) {
 
   const original = noLinks
     ? 'another'
-    : `[this one](${commentPair.original.permalink})`
+    : `[this one](http://np.${commentPair.original.permalink})`
 
   const originalLocation = commentPair.copy.link_id === commentPair.original.link_id
     ? 'elsewhere in this comment section.'
@@ -31,11 +31,11 @@ function createReplyText (commentPair) {
 
   const additional = noLinks
     ? ''
-    : ` with [this](${commentPair.additional[0].copy.permalink}) comment which copies [this one](${commentPair.additional[0].original.permalink})`
+    : ` with [this](http://np.${commentPair.additional[0].copy.permalink}) comment which copies [this one](http://np.${commentPair.additional[0].original.permalink})`
 
   const username = noUsernameLinks
     ? 'the user above'
-    : ` [/u/${commentPair.copy.author.name}](https://www.reddit.com/u/${commentPair.copy.author.name}/)`
+    : ` [/u/${commentPair.copy.author.name}](https://np.reddit.com/u/${commentPair.copy.author.name}/)`
 
   return `This comment was copied from ${original} ${originalLocation}${excuse}
 
@@ -47,7 +47,7 @@ beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be ba
 function createTable (commentPairs) {
   return `Original | Plagiarized\n-------- | -----------`
     + commentPairs.reduce((acc, commentPair) =>
-        acc + `\n[${commentPair.original.id}](${commentPair.original.permalink}) | [${commentPair.copy.id}](${commentPair.copy.permalink})`
+      acc + `\n[${commentPair.original.id}](http://np.${commentPair.original.permalink}) | [${commentPair.copy.id}](http://np.${commentPair.copy.permalink})`
       , '')
 }
 
