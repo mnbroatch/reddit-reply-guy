@@ -552,7 +552,6 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
-  'LifeProTips',
   'all',
   'popular',
   'AskReddit',
@@ -597,6 +596,7 @@ const subreddits = [
   'dataisbeautiful',
   'nonononoyes',
   'ShowerThoughts',
+  'LifeProTips',
 ]
 
 ;(async function () {
@@ -628,7 +628,7 @@ const subreddits = [
 
   // run({
   //   authors: [
-  //     'medicaltrot',
+  //     'fivegateau',
   //   ],
   //   // dryRun: true,
   //   // logTable: true,

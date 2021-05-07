@@ -54,7 +54,7 @@ function createTable (commentPairs) {
 }
 
 function truncate(body) {
-  return body.length <= 30
+  return body.length > 30
     ? body.slice(0, 30) + '...'
     : body
 }
