@@ -7,7 +7,8 @@ const flatMap = require('lodash/flatMap')
 const groupBy = require('lodash/groupBy')
 const {
   findCommentPairsInPost,
-  isSimilar
+  isSimilar,
+  stripComment,
 } = require('./find-comment-pairs')
 const {
   createReplyText,
@@ -22,10 +23,10 @@ const {
   asyncFind,
 } = require('./async-array-helpers')
 const {
-  isCommentFubar,
+  getCommentCooldown,
   getAuthorCooldown,
-  addCommentToFubarList,
   addOrUpdateAuthorCooldown,
+  addOrUpdateCommentCooldown,
   cleanup,
 } = require('./db')
 
@@ -36,18 +37,21 @@ const snoowrap = new Snoowrap({
   username: process.env.REDDIT_USER,
   password: process.env.REDDIT_PASS
 })
-snoowrap.config({ continueAfterRatelimitError: true })
+snoowrap.config({ continueAfterRatelimitError: true, requestDelay: 100 })
 
 
 const EXAMPLE_THREAD_ID = 'mnrn3b'
 const MEGATHREAD_ID = 'mqlaoo'
 const BOT_USER_ID = 't2_8z58zoqn'
-const INITIAL_POST_LIMIT = 20
-const AUTHOR_POST_LIMIT = 30
+const INITIAL_POST_LIMIT = 15
+const AUTHOR_POST_LIMIT = 15
 const POST_CHUNK_SIZE = 5
 const MIN_PLAGIARIST_CASES = 3
+const MAX_COMMENT_AGE = 1000 * 60 * 60 * 24 * 3
+const INITIAL_COOLDOWN = 1000 * 60 * 60
 
 const subredditsThatDisallowBots = [
+  'Gaming',
   'WTF',
   'memes',
   'Jokes',
@@ -142,7 +146,7 @@ async function run ({
           console.log('commentPair.failureReason', commentPair.failureReason)
         } else if (isCommentTooOld(commentPair.copy)) {
           commentPair.failureReason = 'tooOld'
-        } else if (await isCommentFubar(commentPair.copy)) {
+        } else if (await isCommentOnCooldown(commentPair.copy)) {
           commentPair.failureReason = 'commentCooldown'
         } else if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
           commentPair.failureReason = 'alreadyReplied'
@@ -238,10 +242,11 @@ async function findAndAddCommentPairs(authorsData) {
       commentsToSearchChunk,
       async (comment) => {
         try {
-          return findCommentPairsInPost(await getPost(comment.link_id))
+          const post = await getPost(comment.link_id)
+          return findCommentPairsInPost({ ...post, comments: uniqBy([ ...post.comments, comment ], 'id')})
         } catch (e) {
           console.error(e.message)
-          console.error(`Could not get post: ${comment.link_id}`)
+          console.error(`Could not get post: http://reddit.com${comment.permalink}`)
           await addCommentToFubarList(comment)
           return []
         }
@@ -392,7 +397,7 @@ function isAuthorRepetitive(authorComments) {
 async function getInitialPosts(subreddit) {
   let posts = []
   try {
-    posts = await snoowrap.getHot(subreddit, {limit: INITIAL_POST_LIMIT})
+    posts = await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT })
       .map(post => getPost(post.id))
   } catch (e) {
     console.error(`Could not get posts from ${subreddit}: `, e.message)
@@ -468,36 +473,51 @@ async function findCommentPairsInSubreddit (subreddit) {
 }
 
 async function updateAuthorCooldown(name, copyCount = 0) {
-  const maybeAuthor = await getAuthorCooldown(name)
-  const now = Date.now()
+  const maybeAuthor = await getAuthorCooldown({ name })
+  const cooldownStart = Date.now()
 
-  // cooldown doubles up to 1 day unless new cases are found.
   let cooldownEnd
-  if (
-    copyCount > MIN_PLAGIARIST_CASES
-    && copyCount > maybeAuthor?.copyCount // not stale, count has changed
-  ) {
-    cooldownEnd = now
-  } else {
+  if (copyCount > maybeAuthor?.copyCount) { // not stale, count has changed
+    cooldownEnd = cooldownStart
+  } else { // otherwise double cooldown on stale author
     cooldownEnd = maybeAuthor
-      ? now + Math.min((now - maybeAuthor.cooldownStart) * 2, 1000 * 60 * 60 * 24)
-      : now + 1000 * 60 * 60
+      ? cooldownStart + Math.min((maybeAuthor.cooldownEnd - maybeAuthor.cooldownStart) * 2, MAX_COMMENT_AGE)
+      : cooldownStart + INITIAL_COOLDOWN
   }
 
-  return addOrUpdateAuthorCooldown(
+  return addOrUpdateAuthorCooldown({
     name,
-    now,
+    cooldownStart,
     cooldownEnd,
     copyCount
-  )
+  })
+}
+
+async function updateCommentCooldown(id) {
+  const maybeComment = await getCommentCooldown({ id })
+  const cooldownStart = Date.now()
+
+  const cooldownEnd = maybeComment
+    ? cooldownStart + Math.min((maybeComment.cooldownEnd - maybeComment.cooldownStart) * 2, MAX_COMMENT_AGE)
+    : cooldownStart + INITIAL_COOLDOWN
+
+  return addOrUpdateCommentCooldown({
+    id,
+    cooldownStart,
+    cooldownEnd,
+  })
 }
 
 function isCommentTooOld({ created }) {
-  return created < Date.now() / 1000 - 60 * 60 * 24 * 3
+  return created * 1000 < Date.now() - MAX_COMMENT_AGE
 }
 
-async function isAuthorOnCooldown (author) {
-  return (await getAuthorCooldown(author))?.cooldownEnd > Date.now()
+async function isAuthorOnCooldown (name) {
+  return (await getAuthorCooldown({ name }))?.cooldownEnd > Date.now()
+}
+
+async function isCommentOnCooldown ({ id }) {
+  return (await getCommentCooldown({ id }))?.cooldownEnd > Date.now()
 }
 
 function shouldReply (commentPair) {
@@ -508,11 +528,6 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
-  'nonononoyes',
-  'ShowerThoughts',
-  'LifeProTips',
-  'all',
-  'popular',
   'AskReddit',
   'pcmasterrace',
   'videos',
@@ -553,15 +568,20 @@ const subreddits = [
   'DIY',
   'reverseanimalrescue',
   'dataisbeautiful',
+  'nonononoyes',
+  'ShowerThoughts',
+  'LifeProTips',
+  'all',
+  'popular',
 ]
 
 ;(async function () {
-
-  const dryRun = false
+  let dryRun
   // const dryRun = true
+
   while (true) {
     try {
-      await cleanup()
+      await cleanup(MAX_COMMENT_AGE)
       await asyncMapSerial(
         subreddits,
         async (subreddit) => {
@@ -584,7 +604,7 @@ const subreddits = [
 
   // run({
   //   authors: [
-  //     'gfxguyfghrdtg5690',
+  //     'budingetyutyu567',
   //   ],
   //   dryRun: true,
   //   logTable: true,

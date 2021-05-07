@@ -5,36 +5,24 @@ const db = low(adapter)
 
 db
   .defaults({
-    fubarComments: [],
+    commentCooldowns: [],
     authorCooldowns: [],
   })
   .write()
 
-async function isCommentFubar ({ id }) {
-  return !!await db.get('fubarComments')
+async function getCommentCooldown ({ id }) {
+  return !!await db.get('commentCooldowns')
     .find({ id })
     .value()
 }
 
-function getAuthorCooldown(name) {
+function getAuthorCooldown({ name }) {
   return db.get('authorCooldowns')
     .find({ name })
     .value()
 }
 
-async function addCommentToFubarList({ id }) {
-  if (
-    !await db.get('fubarComments')
-      .find({ id })
-      .value()
-  ) {
-    db.get('fubarComments')
-      .push({ id, processedAt: Date.now() })
-      .write()
-  }
-}
-
-async function addOrUpdateAuthorCooldown(name, cooldownStart, cooldownEnd, copyCount) {
+async function addOrUpdateAuthorCooldown({ name, cooldownStart, cooldownEnd, copyCount }) {
   if (
     await db.get('authorCooldowns')
       .find({ name })
@@ -51,21 +39,38 @@ async function addOrUpdateAuthorCooldown(name, cooldownStart, cooldownEnd, copyC
   }
 }
 
-// maybe change all to cooldown rather than fubar for simplification
-async function cleanup() {
-  await db.get('authorCooldowns')
-    .remove(({ cooldownEnd }) => cooldownEnd < Date.now())
-    .write()
+async function addOrUpdateCopyCooldown({ name, cooldownStart, cooldownEnd }) {
+  if (
+    await db.get('commentCooldowns')
+      .find({ name })
+      .value()
+  ) {
+    await db.get('commentCooldowns')
+      .find({ name })
+      .assign({ cooldownStart, cooldownEnd })
+      .write()
+  } else {
+    await db.get('commentCooldowns')
+      .push({ name, cooldownStart, cooldownEnd })
+      .write()
+  }
+}
 
-  await db.get('fubarComments')
-    .remove(({ processedAt }) => processedAt < Date.now() - 1000 * 60 * 60 * 24 * 3)
-    .write()
+async function cleanup(maxCommentAge) {
+  asyncMap(
+    [ 'authorCooldowns', 'commentCooldowns' ],
+    async (commentType) => {
+      await db.get(commentType)
+        .remove(({ cooldownEnd }) => cooldownEnd < Date.now() - maxCommentAge)
+        .write()
+    }
+  )
 }
 
 module.exports = {
-  isCommentFubar,
   getAuthorCooldown,
-  addCommentToFubarList,
+  getCommentCooldown,
   addOrUpdateAuthorCooldown,
+  addOrUpdateCommentCooldown,
   cleanup,
 }

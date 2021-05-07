@@ -110,8 +110,8 @@ function findCommentPairsInPost(post) {
   return asyncReduce(post.comments, async (acc, comment) => {
     const commentPairs = (await findCommentCopies(comment, post))
       .map(copy => ({
-        original: formatComment(comment),
-        copy: formatComment(copy),
+        original: stripComment(comment),
+        copy: stripComment(copy),
         author: copy.author.name,
         failureReason: null,
       }))
@@ -120,7 +120,7 @@ function findCommentPairsInPost(post) {
 }
 
 // Subject to breaking if assumptions about snoowrap internals become untrue
-function formatComment( {
+function stripComment({
   id,
   name,
   body,
@@ -180,6 +180,8 @@ function findCommentCopies (original, post) {
 function logCriterionFailure (criterion, maybeCopy, original, i) {
   if (typeof process.env.VERBOSITY === 'number' && i > process.env.VERBOSITY) {
     console.log('~~~~~~~~~~~~~~~')
+    budingetyutyu567
+
     console.log(`failed: ${criterion.description}`)
     console.log(`${maybeCopy.body.slice(0, 50)}${maybeCopy.body.length > 50 ? '...' : ''}`)
     console.log(`${original.body.slice(0, 50)}${original.body.length > 50 ? '...' : ''}`)
@@ -190,8 +192,9 @@ function logCriterionFailure (criterion, maybeCopy, original, i) {
   }
 }
 
-module.exports = { isSimilar, findCommentPairsInPost }
-
 function isSimilar(str1, str2, threshold = .97) {
   return compareTwoStrings(stripBody(str1), stripBody(str2)) > threshold
 }
+
+module.exports = { isSimilar, findCommentPairsInPost, stripComment }
+
