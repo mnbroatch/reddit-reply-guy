@@ -19,7 +19,7 @@ function createReplyText (commentPair) {
 
   const original = noLinks
     ? 'another'
-    : `[this one](http://np.${commentPair.original.permalink})`
+    : `[this one](http://np.reddit.com${commentPair.original.permalink})`
 
   const originalLocation = commentPair.copy.link_id === commentPair.original.link_id
     ? 'elsewhere in this comment section.'
@@ -30,8 +30,10 @@ function createReplyText (commentPair) {
     : '' 
 
   const additional = noLinks
-    ? ''
-    : ` with [this](http://np.${commentPair.additional[0].copy.permalink}) comment which copies [this one](http://np.${commentPair.additional[0].original.permalink})`
+    ? '.'
+    : `:
+
+${createTable(commentPair.additional)}`
 
   const username = noUsernameLinks
     ? 'the user above'
@@ -39,7 +41,7 @@ function createReplyText (commentPair) {
 
   return `This comment was copied from ${original} ${originalLocation}${excuse}
 
-It is probably not a coincidence, because this user has done it before${additional}.
+It is probably not a coincidence, because this user has done it before${additional}
 
 beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
 }
@@ -47,7 +49,7 @@ beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be ba
 function createTable (commentPairs) {
   return `Original | Plagiarized\n-------- | -----------`
     + commentPairs.reduce((acc, commentPair) =>
-      acc + `\n[${commentPair.original.id}](http://np.${commentPair.original.permalink}) | [${commentPair.copy.id}](http://np.${commentPair.copy.permalink})`
+      acc + `\n[${commentPair.original.id}](http://np.reddit.com${commentPair.original.permalink}) | [${commentPair.copy.id}](http://np.reddit.com${commentPair.copy.permalink})`
       , '')
 }
 

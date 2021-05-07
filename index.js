@@ -124,7 +124,7 @@ async function run ({
   try {
     await tagAuthorsOnCooldown(authorsData)
     await fetchAndAddComments(authorsData) // maybe strip these
-    await tagRepetitiveAuthors(authorsData)
+    await removeRepetitiveComments(authorsData)
     await tagFubarComments(authorsData)
 
     await findAndAddCommentPairs(authorsData)
@@ -302,10 +302,23 @@ async function tagAuthorsOnCooldown(authorsData) {
   })
 }
 
-async function tagRepetitiveAuthors(authorsData) {
+// If an author posts the same thing repeatedly, we will
+// assume they are just being boring and not plagiarizing.
+async function removeRepetitiveComments(authorsData) {
   await asyncMap(authorsData, async (authorData) => {
-    if (!authorData.failureReason && await isAuthorRepetitive(authorData.comments)) {
-      authorData.failureReason = 'repetitive'
+    if (!authorData.failureReason) {
+      const authorCommentsByBody = authorData.comments.reduce((acc, comment) => {
+        const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, .67))
+        return maybeKey
+          ? { ...acc, [maybeKey]: [ ...acc[maybeKey], comment ] }
+          : { ...acc, [comment.body]: [comment] }
+      }, {})
+
+      authorData.comments = Object.values(authorCommentsByBody).reduce((acc, similarComments) => {
+        return similarBodies.length < 2
+          ? [ ...acc, ...similarBodies ]
+          : acc
+      }, [])
     }
   })
 }
@@ -374,24 +387,6 @@ async function logTables (authorsData) {
       console.log(createTable(authorData.commentPairs))
     }
   })
-}
-
-// If an author posts the same thing a lot of the time
-// we will assume they are just boring and not a plagiarist.
-function isAuthorRepetitive(authorComments) {
-  // assuming transitivity is slightly wrong but ok for this.
-  // similarity threshold is low while I watch for false negatives
-  const similarBodyCounts = authorComments.reduce((acc, comment) => {
-    const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, .67))
-    return maybeKey
-      ? { ...acc, [maybeKey]: acc[maybeKey] + 1 }
-      : { ...acc, [comment.body]: 1 }
-  }, 0)
-
-  // How many comments are similar to others?
-  return Object.values(similarBodyCounts).reduce((acc, bodyCount) => {
-    return bodyCount > 1 ? acc + bodyCount : acc 
-  }, 0) > authorComments.length / 5
 }
 
 async function getInitialPosts(subreddit) {
@@ -579,37 +574,37 @@ const subreddits = [
   let dryRun
   // const dryRun = true
 
-  while (true) {
-    try {
-      await cleanup(MAX_COMMENT_AGE)
-      await asyncMapSerial(
-        subreddits,
-        async (subreddit) => {
-          try {
-            const initialCommentPairs = await run({ subreddit, dryRun })
-            if (initialCommentPairs.length) {
-              await run({ initialCommentPairs, dryRun })
-            }
-          } catch (e) {
-            console.error(`something went wrong:`)
-            console.error(e)
-          }
-        }
-      )
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
+  // while (true) {
+  //   try {
+  //     await cleanup(MAX_COMMENT_AGE)
+  //     await asyncMapSerial(
+  //       subreddits,
+  //       async (subreddit) => {
+  //         try {
+  //           const initialCommentPairs = await run({ subreddit, dryRun })
+  //           if (initialCommentPairs.length) {
+  //             await run({ initialCommentPairs, dryRun })
+  //           }
+  //         } catch (e) {
+  //           console.error(`something went wrong:`)
+  //           console.error(e)
+  //         }
+  //       }
+  //     )
+  //   } catch (e) {
+  //     console.error(`something went wrong:`)
+  //     console.error(e)
+  //   }
+  // }
 
-  // run({
-  //   authors: [
-  //     'budingetyutyu567',
-  //   ],
-  //   dryRun: true,
-  //   logTable: true,
-  //   // subreddit: 'memes',
-  // })
+  run({
+    authors: [
+      'Firm-Belly33',
+    ],
+    // dryRun: true,
+    // logTable: true,
+    // subreddit: 'memes',
+  })
 
 })()
 
