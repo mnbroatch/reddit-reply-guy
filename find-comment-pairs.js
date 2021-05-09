@@ -34,7 +34,7 @@ const criteria = [
   {
     description: 'Is body long enough?',
     test: (maybeCopy) =>
-      stripBody(maybeCopy.body).length > 15,
+      stripQuotes(maybeCopy.body).length > 15,
   },
   {
     description: 'Is author copying someone other than themselves?',
@@ -78,11 +78,11 @@ const criteria = [
   },
 ]
 
-function stripBody(comment) {
+// probably not robust enough
+function stripQuotes(comment) {
   return comment.split('\n')
-    .filter(line => line.trim()[0] !== '>') // probably not robust enough
+    .filter(line => line.trim()[0] !== '>')
     .join(' ')
-    .replace(/\W/g, ' ')
 }
 
 // Breaks if we didn't fetch the whole thread from root to comment.
@@ -193,8 +193,8 @@ function logCriterionFailure (criterion, maybeCopy, original, i) {
 }
 
 function isSimilar(str1, str2, threshold = .97) {
-  return compareTwoStrings(stripBody(str1), stripBody(str2)) > threshold
+  return compareTwoStrings(stripQuotes(str1), stripQuotes(str2)) > threshold
 }
 
-module.exports = { isSimilar, findCommentPairsInPost, stripBody }
+module.exports = { isSimilar, findCommentPairsInPost }
 

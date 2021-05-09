@@ -1,5 +1,3 @@
-const { stripBody } = require('./find-comment-pairs')
-
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
 ]
@@ -56,9 +54,10 @@ function createTable (commentPairs) {
 }
 
 function truncate(body) {
-  return body.length > 30
-    ? stripBody(body.slice(0, 30)) + '...'
-    : stripBody(body)
+  const strippedBody = body.replace(/\W/g, ' ')
+  return strippedBody.length > 30
+    ? strippedBody.slice(0, 30) + '...'
+    : strippedBody
 }
 
 module.exports = {

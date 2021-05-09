@@ -43,17 +43,18 @@ const {
   EXAMPLE_THREAD_ID,
   MEGATHREAD_ID,
   BOT_USER_ID,
-  INITIAL_POST_LIMIT,
-  AUTHOR_POST_LIMIT,
-  POST_CHUNK_SIZE,
-  MIN_PLAGIARIST_CASES,
-  MAX_COMMENT_AGE,
-  INITIAL_COOLDOWN,
 } = process.env
-
-console.log('MAX_COMMENT_AGE', MAX_COMMENT_AGE)
+const INITIAL_POST_LIMIT = +process.env.INITIAL_POST_LIMIT 
+const AUTHOR_POST_LIMIT = +process.env.AUTHOR_POST_LIMIT
+const POST_CHUNK_SIZE = +process.env.POST_CHUNK_SIZE
+const MIN_PLAGIARIST_CASES = +process.env.MIN_PLAGIARIST_CASES
+const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE
+const INITIAL_COOLDOWN = +process.env.INITIAL_COOLDOWN
 
 const subredditsThatDisallowBots = [
+  'sweden',
+  'Israel',
+  'Arkansas',
   'MakeMeSuffer',
   'barkour',
   'funny',
@@ -183,13 +184,14 @@ async function run ({
       console.log('--------------------')
       console.log(authorData.author)
       console.log(`${authorData.commentPairs.length} total cases`)
-      if (authorData.failureReason === 'insufficientEvidence') {
-        authorData.commentPairs.forEach((comentPair) => {
+      if (authorData.failureReason === 'insufficientEvidence' && authorData.commentPairs.length) {
+        console.log('insufficient evidence:')
+        authorData.commentPairs.forEach((commentPair) => {
           console.log('commentPair.copy.body', commentPair.copy.body)
           console.log(`http://reddit.com${commentPair.copy.permalink}`)
         })
       } else if (authorData.failureReason) {
-        console.log('authorData.failureReason', authorData.failureReason)
+        console.log(authorData.failureReason)
       } else {
         const { failed = [], succeeded = [], broken = [] } = groupBy(
           authorData.commentPairs,
@@ -457,7 +459,7 @@ async function getInitialPosts(subreddit) {
   let posts = []
   try {
     posts = await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT })
-      .map(post => getPost(post.id)), await getPost('t3_n7h6u2')
+      .map(post => getPost(post.id))
   } catch (e) {
     console.error(`Could not get posts from ${subreddit}: `, e.message)
   }
@@ -511,6 +513,7 @@ async function getCommentsFromAuthor(author) {
   try {
     return snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
   } catch (e) {
+    console.error(e)
     console.error(`couldn't get author comments: http://reddit.com/u/${author}`)
     await updateAuthorCooldown(author)
     return []
@@ -587,6 +590,25 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
+  'Music',
+  'Genshin_Impact',
+  'movies',
+  'Art',
+  'blog',
+  'aww',
+  'memes',
+  'DIY',
+  'reverseanimalrescue',
+  'dataisbeautiful',
+  'nonononoyes',
+  'ShowerThoughts',
+  'LifeProTips',
+  'all',
+  'popular',
+  'AskReddit',
+  'pcmasterrace',
+  'videos',
+  'mildlyinteresting',
   'pics',
   'gifs',
   'NatureIsFuckingLit',
@@ -613,62 +635,46 @@ const subreddits = [
   'cats',
   'instant_regret',
   'science',
-  'Music',
-  'Genshin_Impact',
-  'movies',
-  'Art',
-  'blog',
-  'aww',
-  'memes',
-  'DIY',
-  'reverseanimalrescue',
-  'dataisbeautiful',
-  'nonononoyes',
-  'ShowerThoughts',
-  'LifeProTips',
-  'all',
-  'popular',
-  'AskReddit',
-  'pcmasterrace',
-  'videos',
-  'mildlyinteresting',
 ]
 
 ;(async function () {
   let dryRun
   // dryRun = true
 
-  // while (true) {
-  //   try {
-  //     await cleanup(MAX_COMMENT_AGE)
-  //     await asyncMapSerial(
-  //       subreddits,
-  //       async (subreddit) => {
-  //         try {
-  //           const commentPairs = await run({ subreddit, dryRun })
-  //           if (commentPairs.length) {
-  //             await run({ commentPairs, dryRun })
-  //           }
-  //         } catch (e) {
-  //           console.error(`something went wrong:`)
-  //           console.error(e)
-  //         }
-  //       }
-  //     )
-  //   } catch (e) {
-  //     console.error(`something went wrong:`)
-  //     console.error(e)
-  //   }
-  // }
+  while (true) {
+    try {
+      await cleanup(MAX_COMMENT_AGE)
+      await asyncMapSerial(
+        subreddits,
+        async (subreddit) => {
+          try {
+            const commentPairs = await run({ subreddit, dryRun })
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            console.log(uniqBy(commentPairs.map(cp => cp.author)))
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            if (commentPairs.length) {
+              await run({ commentPairs, dryRun })
+            }
+          } catch (e) {
+            console.error(`something went wrong:`)
+            console.error(e)
+          }
+        }
+      )
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
 
-  run({
-    dryRun: true,
-    // logTable: true,
-    authors: [
-      'ItsTheHamster07',
-    ],
-    // subreddit: '',
-  })
+  // run({
+  //   dryRun: true,
+  //   // logTable: true,
+  //   authors: [
+  //     'ItsTheHamster07',
+  //   ],
+  //   // subreddit: '',
+  // })
 
 })()
 
