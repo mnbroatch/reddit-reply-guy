@@ -37,21 +37,29 @@ const snoowrap = new Snoowrap({
   password: process.env.REDDIT_PASS
 })
 
-snoowrap.config({ continueAfterRatelimitError: true, requestDelay: 300 })
+snoowrap.config({ continueAfterRatelimitError: true, requestDelay: 500, debug: true })
 
-const EXAMPLE_THREAD_ID = 'mnrn3b'
-const MEGATHREAD_ID = 'mqlaoo'
-const BOT_USER_ID = 't2_8z58zoqn'
-const INITIAL_POST_LIMIT = 15
-const AUTHOR_POST_LIMIT = 15
-const POST_CHUNK_SIZE = 5
-const MIN_PLAGIARIST_CASES = 3
-const MAX_COMMENT_AGE = 1000 * 60 * 60 * 24 * 3
-const INITIAL_COOLDOWN = 1000 * 60 * 60
+const {
+  EXAMPLE_THREAD_ID,
+  MEGATHREAD_ID,
+  BOT_USER_ID,
+  INITIAL_POST_LIMIT,
+  AUTHOR_POST_LIMIT,
+  POST_CHUNK_SIZE,
+  MIN_PLAGIARIST_CASES,
+  MAX_COMMENT_AGE,
+  INITIAL_COOLDOWN,
+} = process.env
+
+console.log('MAX_COMMENT_AGE', MAX_COMMENT_AGE)
 
 const subredditsThatDisallowBots = [
+  'MakeMeSuffer',
+  'barkour',
+  'funny',
   'Futurology',
   'Gaming',
+  'Games',
   'WTF',
   'memes',
   'Jokes',
@@ -59,27 +67,12 @@ const subredditsThatDisallowBots = [
   'books',
   'EarthPorn',
   'AskReddit',
-  'SteamGameSwap',
-  'SteamTradingCards',
-  'mushroomkingdom',
-  'SchlockMercenary',
-  'SGS',
-  'bans',
-  'sgsappeals',
-  'SGScirclejerk',
-  'Steamworks',
-  'FlairLinkerEnhanced',
-  'RUGCTrade',
   'holdmyredbull',
   'IAmA',
   'todayilearned',
   'sports',
   'politics',
 ]
-
-// Some posts simply won't return /u/reply-guy-bot comments for seemingly no reason.
-// If duplicate bot replies are noticed, comment should go here -_-
-const fubarCommentIds = []
 
 async function run ({
   subreddit,
@@ -88,7 +81,7 @@ async function run ({
   dryRun,
   commentPairs = [],
 }) {
-  console.log('==================================================')
+  console.log('1==================================================')
   console.log(`subreddit: ${subreddit || 'none'}`)
 
   const initialCommentPairs = uniqBy(
@@ -99,6 +92,7 @@ async function run ({
     'copy.id'
   )
 
+  console.log('2==================================================')
   const authorsData = Object.entries(groupBy(initialCommentPairs, 'author'))
     .reduce((acc, [author, authorCommentPairs]) => [
       ...acc,
@@ -124,12 +118,12 @@ async function run ({
   try {
     await tagAuthorsOnCooldown(authorsData)
     await fetchAndAddComments(authorsData) // maybe strip these
-    await removeRepetitiveComments(authorsData)
-    await tagFubarComments(authorsData)
-
+    console.log('3==================================================')
+    tagRepetitiveComments(authorsData)
+    await tagCommentsOnCooldown(authorsData)
     await findAndAddCommentPairs(authorsData)
     // could fetch more comments by guilty authors here
-    // await findAndAddMoreCommentPairs(authorsData)
+    console.log('4==================================================')
 
     await tagAuthorsWithInsufficientEvidence(authorsData)
     await updateAuthorCooldowns(authorsData)
@@ -138,6 +132,7 @@ async function run ({
       logTables(authorsData)
     }
 
+    console.log('5==================================================')
     await traverseCommentPairs(
       authorsData,
       async (commentPair, authorCommentPairs) => {
@@ -173,10 +168,11 @@ async function run ({
         }
 
         if (commentPair.failureReason === 'broken') {
-          await addCommentToFubarList(commentPair.copy)
+          await updateCommentCooldown(commentPair.copy)
         }
       }
     )
+    console.log('6==================================================')
   } catch (e) {
     console.error(e)
   }
@@ -187,7 +183,12 @@ async function run ({
       console.log('--------------------')
       console.log(authorData.author)
       console.log(`${authorData.commentPairs.length} total cases`)
-      if (authorData.failureReason) {
+      if (authorData.failureReason === 'insufficientEvidence') {
+        authorData.commentPairs.forEach((comentPair) => {
+          console.log('commentPair.copy.body', commentPair.copy.body)
+          console.log(`http://reddit.com${commentPair.copy.permalink}`)
+        })
+      } else if (authorData.failureReason) {
         console.log('authorData.failureReason', authorData.failureReason)
       } else {
         const { failed = [], succeeded = [], broken = [] } = groupBy(
@@ -250,18 +251,23 @@ async function updateAuthorCooldowns(authorsData) {
   })
 }
 
+function groupCommentsBySimilarBody (comments) {
+  return comments.reduce((acc, comment) => {
+    const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, .67))
+    return maybeKey
+      ? { ...acc, [maybeKey]: [ ...acc[maybeKey], comment ] }
+      : { ...acc, [comment.body]: [comment] }
+  }, {})
+}
+
 async function findAndAddCommentPairs(authorsData) {
-  const commentsToSearch = uniqBy(await asyncReduce(
-    authorsData,
-    async (acc, authorData) => {
-      return [
-        ...acc,
-        ...authorData.comments
-          .filter(comment => !authorData.author.failureReason && !comment.failureReason)
-      ]
-    },
-    []
-  ))
+  const commentsToSearch = uniqBy(
+    authorsData.reduce((acc, authorData) => [
+      ...acc,
+      ...authorData.comments
+        .filter(comment => !authorData.author.failureReason && !comment.failureReason)
+    ], [])
+  )
 
   const commentPairs = (await asyncMapSerial(
     chunk(commentsToSearch, POST_CHUNK_SIZE),
@@ -270,11 +276,38 @@ async function findAndAddCommentPairs(authorsData) {
       async (comment) => {
         try {
           const post = await getPost(comment.link_id)
-          return findCommentPairsInPost({ ...post, comments: uniqBy([ ...post.comments, comment ], 'id')})
+          const postComments = uniqBy(
+            [ comment, ...post.comments ],
+            'id'
+          )
+          const postCommentsByAuthor = groupBy(
+            postComments,
+            'author.name'
+          )
+
+          Object.entries(postCommentsByAuthor).forEach(([author, authorComments]) => {
+            const maybeAuthorData = authorsData.find(authorData => authorData.author === author)
+            if (maybeAuthorData) {
+              const authorCommentsByBody = groupCommentsBySimilarBody(
+                uniqBy([ ...authorComments, ...maybeAuthorData.comments ], 'id')
+              )
+              Object.values(authorCommentsByBody).forEach((similarComments) => {
+                if (similarComments.length > 1) {
+                  similarComments.forEach((comment) => {
+                    comment.failureReason = 'repetitiveAuthor'
+                  })
+                }
+              })
+            }
+          })
+          return findCommentPairsInPost({
+            ...post,
+            comments: postComments.filter(comment => !comment.failureReason)
+          })
         } catch (e) {
           console.error(e.message)
           console.error(`Could not get post: http://reddit.com${comment.permalink}`)
-          await addCommentToFubarList(comment)
+          await addOrUpdateAuthorCooldown(comment)
           return []
         }
       }
@@ -309,11 +342,11 @@ async function fetchAndAddComments(authorsData) {
   })
 }
 
-async function tagFubarComments(authorsData) {
+async function tagCommentsOnCooldown(authorsData) {
   await asyncMap(authorsData, async (authorData) => {
     if (!authorData.failureReason) {
       await asyncMap(authorData.comment, async (comment) => {
-        if (!comment.failureReason && await isCommentFubar(comment)) {
+        if (!comment.failureReason && await isCommentOnCooldown(comment)) {
           comment.failureReason = 'commentCooldown'
         }
       })
@@ -330,21 +363,23 @@ async function tagAuthorsOnCooldown(authorsData) {
 }
 
 // If an author posts the same thing repeatedly, we will
-// assume they are just being boring and not plagiarizing.
-async function removeRepetitiveComments(authorsData) {
-  await asyncMap(authorsData, async (authorData) => {
+// assume they are just being boring, not plagiarizing.
+function tagRepetitiveComments(authorsData) {
+  authorsData.forEach((authorData) => {
     if (!authorData.failureReason) {
-      const authorCommentsByBody = authorData.comments.reduce((acc, comment) => {
-        const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, .67))
-        return maybeKey
-          ? { ...acc, [maybeKey]: [ ...acc[maybeKey], comment ] }
-          : { ...acc, [comment.body]: [comment] }
-      }, {})
-      authorData.comments = Object.values(authorCommentsByBody).reduce((acc, similarComments) => {
-        return similarBodies.length < 2
-          ? [ ...acc, ...similarBodies ]
-          : acc
-      }, [])
+      const authorCommentsByBody = groupCommentsBySimilarBody(authorData.comments)
+      Object.values(authorCommentsByBody).forEach((similarComments) => {
+        if (similarComments.length > 1) {
+          similarComments.forEach((comment) => {
+            comment.failureReason = 'repetitiveAuthor'
+            const maybeAuthorData = authorsData.find(data => data.author === comment.author.name)
+            const maybeCommentPair = maybeAuthorData?.commentPairs.find(commentPair => comment.id === commentPair.copy.id)
+            if (maybeCommentPair) {
+              maybeCommentPair.failureReason = 'repetitiveAuthor'
+            }
+          })
+        }
+      })
     }
   })
 }
@@ -422,7 +457,7 @@ async function getInitialPosts(subreddit) {
   let posts = []
   try {
     posts = await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT })
-      .map(post => getPost(post.id))
+      .map(post => getPost(post.id)), await getPost('t3_n7h6u2')
   } catch (e) {
     console.error(`Could not get posts from ${subreddit}: `, e.message)
   }
@@ -552,12 +587,6 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
-  'all',
-  'popular',
-  'AskReddit',
-  'pcmasterrace',
-  'videos',
-  'mildlyinteresting',
   'pics',
   'gifs',
   'NatureIsFuckingLit',
@@ -597,43 +626,49 @@ const subreddits = [
   'nonononoyes',
   'ShowerThoughts',
   'LifeProTips',
+  'all',
+  'popular',
+  'AskReddit',
+  'pcmasterrace',
+  'videos',
+  'mildlyinteresting',
 ]
 
 ;(async function () {
   let dryRun
-  // const dryRun = true
+  // dryRun = true
 
-  while (true) {
-    try {
-      await cleanup(MAX_COMMENT_AGE)
-      await asyncMapSerial(
-        subreddits,
-        async (subreddit) => {
-          try {
-            const commentPairs = await run({ subreddit, dryRun })
-            if (commentPairs.length) {
-              await run({ commentPairs, dryRun })
-            }
-          } catch (e) {
-            console.error(`something went wrong:`)
-            console.error(e)
-          }
-        }
-      )
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
+  // while (true) {
+  //   try {
+  //     await cleanup(MAX_COMMENT_AGE)
+  //     await asyncMapSerial(
+  //       subreddits,
+  //       async (subreddit) => {
+  //         try {
+  //           const commentPairs = await run({ subreddit, dryRun })
+  //           if (commentPairs.length) {
+  //             await run({ commentPairs, dryRun })
+  //           }
+  //         } catch (e) {
+  //           console.error(`something went wrong:`)
+  //           console.error(e)
+  //         }
+  //       }
+  //     )
+  //   } catch (e) {
+  //     console.error(`something went wrong:`)
+  //     console.error(e)
+  //   }
+  // }
 
-  // run({
-  //   authors: [
-  //     'fivegateau',
-  //   ],
-  //   // dryRun: true,
-  //   // logTable: true,
-  //   // subreddit: 'memes',
-  // })
+  run({
+    dryRun: true,
+    // logTable: true,
+    authors: [
+      'ItsTheHamster07',
+    ],
+    // subreddit: '',
+  })
 
 })()
 

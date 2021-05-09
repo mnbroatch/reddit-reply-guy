@@ -80,9 +80,9 @@ const criteria = [
 
 function stripBody(comment) {
   return comment.split('\n')
-    .filter(line => line.trim()[0] !== '>')
-    .join('\n')
-    .replace(/\W/g, '')
+    .filter(line => line.trim()[0] !== '>') // probably not robust enough
+    .join(' ')
+    .replace(/\W/g, ' ')
 }
 
 // Breaks if we didn't fetch the whole thread from root to comment.
@@ -180,7 +180,7 @@ function findCommentCopies (original, post) {
 }
 
 function logCriterionFailure (criterion, maybeCopy, original, i) {
-  if (typeof process.env.VERBOSITY === 'number' && i > process.env.VERBOSITY) {
+  if (maybeCopy.id === '') {
     console.log('~~~~~~~~~~~~~~~')
     console.log(`failed: ${criterion.description}`)
     console.log(`${maybeCopy.body.slice(0, 50)}${maybeCopy.body.length > 50 ? '...' : ''}`)
@@ -196,5 +196,5 @@ function isSimilar(str1, str2, threshold = .97) {
   return compareTwoStrings(stripBody(str1), stripBody(str2)) > threshold
 }
 
-module.exports = { isSimilar, findCommentPairsInPost }
+module.exports = { isSimilar, findCommentPairsInPost, stripBody }
 

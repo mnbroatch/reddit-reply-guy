@@ -1,3 +1,5 @@
+const { stripBody } = require('./find-comment-pairs')
+
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
 ]
@@ -39,7 +41,7 @@ ${createTable(commentPair.additional)}`
     ? 'the user above'
     : ` [/u/${commentPair.copy.author.name}](https://np.reddit.com/u/${commentPair.copy.author.name}/)`
 
-  return `This comment was copied from ${original} ${originalLocation}${excuse}
+  return `The above comment was stolen from ${original} ${originalLocation}${excuse}
 
 It is probably not a coincidence, because this user has done it before${additional}
 
@@ -55,8 +57,8 @@ function createTable (commentPairs) {
 
 function truncate(body) {
   return body.length > 30
-    ? body.slice(0, 30) + '...'
-    : body
+    ? stripBody(body.slice(0, 30)) + '...'
+    : stripBody(body)
 }
 
 module.exports = {

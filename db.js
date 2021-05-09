@@ -40,19 +40,19 @@ async function addOrUpdateAuthorCooldown({ name, cooldownStart, cooldownEnd, cop
   }
 }
 
-async function addOrUpdateCommentCooldown({ name, cooldownStart, cooldownEnd }) {
+async function addOrUpdateCommentCooldown({ id, cooldownStart, cooldownEnd }) {
   if (
     await db.get('commentCooldowns')
-      .find({ name })
+      .find({ id })
       .value()
   ) {
     await db.get('commentCooldowns')
-      .find({ name })
+      .find({ id })
       .assign({ cooldownStart, cooldownEnd })
       .write()
   } else {
     await db.get('commentCooldowns')
-      .push({ name, cooldownStart, cooldownEnd })
+      .push({ id, cooldownStart, cooldownEnd })
       .write()
   }
 }
