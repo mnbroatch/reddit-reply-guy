@@ -37,7 +37,7 @@ const snoowrap = new Snoowrap({
   password: process.env.REDDIT_PASS
 })
 
-snoowrap.config({ continueAfterRatelimitError: true, requestDelay: 500, debug: true })
+snoowrap.config({ continueAfterRatelimitError: true, requestDelay: 500 })
 
 const {
   EXAMPLE_THREAD_ID,
@@ -52,6 +52,9 @@ const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE
 const INITIAL_COOLDOWN = +process.env.INITIAL_COOLDOWN
 
 const subredditsThatDisallowBots = [
+  'Republican',
+  'OldPhotosInRealLife',
+  'cars',
   'sweden',
   'Israel',
   'Arkansas',
@@ -137,32 +140,32 @@ async function run ({
     await traverseCommentPairs(
       authorsData,
       async (commentPair, authorCommentPairs) => {
-        // should probably refactor this if else chain
+        // should probably refactor all this
         if (commentPair.failureReason) {
-          // shouldn't ever get here
+          // not sure why we'd get here
           console.log('commentPair.failureReason', commentPair.failureReason)
         } else if (isCommentTooOld(commentPair.copy)) {
           commentPair.failureReason = 'tooOld'
         } else if (await isCommentOnCooldown(commentPair.copy)) {
           commentPair.failureReason = 'commentCooldown'
-        } else {
-          try {
-            if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
-              commentPair.failureReason = 'alreadyReplied'
-            }
-          } catch (e) {
-            console.error(`couldn't get replies for: http://reddit.com${commentPair.copy.permalink}`)
-            commentPair.failureReason = 'broken'
-          }
-        }
-          
+        } 
+
         if (dryRun && !commentPair.failureReason) {
           commentPair.failureReason = 'dryRun'
         } else if (!commentPair.failureReason) {
           commentPair.additional = authorCommentPairs.filter(c => commentPair !== c)
           await reportCommentPair(commentPair)
           if (shouldReply(commentPair)) {
-            await replyToCommentPair(commentPair)
+            try {
+              if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
+                commentPair.failureReason = 'alreadyReplied'
+              } else {
+                await replyToCommentPair(commentPair)
+              }
+            } catch (e) {
+              console.error(`couldn't get replies for: http://reddit.com${commentPair.copy.permalink}`)
+              commentPair.failureReason = 'broken'
+            }
           } else {
             commentPair.noReply = 'true'
           }
@@ -590,10 +593,6 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
-  'Music',
-  'Genshin_Impact',
-  'movies',
-  'Art',
   'blog',
   'aww',
   'memes',
@@ -635,6 +634,11 @@ const subreddits = [
   'cats',
   'instant_regret',
   'science',
+  'Music',
+  'Genshin_Impact',
+  'movies',
+  'PoliticalHumor',
+  'Art',
 ]
 
 ;(async function () {
@@ -650,6 +654,7 @@ const subreddits = [
           try {
             const commentPairs = await run({ subreddit, dryRun })
             console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            console.log(`authors:`)
             console.log(uniqBy(commentPairs.map(cp => cp.author)))
             console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
             if (commentPairs.length) {
@@ -667,14 +672,14 @@ const subreddits = [
     }
   }
 
-  // run({
-  //   dryRun: true,
-  //   // logTable: true,
-  //   authors: [
-  //     'ItsTheHamster07',
-  //   ],
-  //   // subreddit: '',
-  // })
+  run({
+    // dryRun: true,
+    // logTable: true,
+    authors: [
+      // 'SheriffComey',
+    ],
+    // subreddit: '',
+  })
 
 })()
 
