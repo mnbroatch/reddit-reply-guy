@@ -52,6 +52,8 @@ const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE
 const INITIAL_COOLDOWN = +process.env.INITIAL_COOLDOWN
 
 const subredditsThatDisallowBots = [
+  'gratefuldead',
+  'ich_iel',
   'Republican',
   'OldPhotosInRealLife',
   'cars',
@@ -140,7 +142,6 @@ async function run ({
     await traverseCommentPairs(
       authorsData,
       async (commentPair, authorCommentPairs) => {
-        // should probably refactor all this
         if (commentPair.failureReason) {
           // not sure why we'd get here
           console.log('commentPair.failureReason', commentPair.failureReason)
@@ -148,24 +149,26 @@ async function run ({
           commentPair.failureReason = 'tooOld'
         } else if (await isCommentOnCooldown(commentPair.copy)) {
           commentPair.failureReason = 'commentCooldown'
-        } 
+        } else {
+          try {
+            if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
+              commentPair.failureReason = 'alreadyReplied'
+            }
+          } catch (e) {
+            console.error(`couldn't get replies for: http://reddit.com${commentPair.copy.permalink}`)
+            commentPair.failureReason = 'broken'
+          }
+        }
 
-        if (dryRun && !commentPair.failureReason) {
+        if (!commentPair.failureReason && dryRun) {
           commentPair.failureReason = 'dryRun'
-        } else if (!commentPair.failureReason) {
+        }
+
+        if (!commentPair.failureReason) {
           commentPair.additional = authorCommentPairs.filter(c => commentPair !== c)
           await reportCommentPair(commentPair)
           if (shouldReply(commentPair)) {
-            try {
-              if (await isCommentAlreadyRepliedTo(commentPair.copy)) {
-                commentPair.failureReason = 'alreadyReplied'
-              } else {
-                await replyToCommentPair(commentPair)
-              }
-            } catch (e) {
-              console.error(`couldn't get replies for: http://reddit.com${commentPair.copy.permalink}`)
-              commentPair.failureReason = 'broken'
-            }
+            await replyToCommentPair(commentPair)
           } else {
             commentPair.noReply = 'true'
           }
@@ -218,9 +221,7 @@ async function run ({
         })
 
         succeeded.forEach((commentPair) => {
-          if (dryRun) {
-            console.log(`dry run http://reddit.com${commentPair.copy.permalink}`)
-          } else if (commentPair.noReply) {
+          if (commentPair.noReply) {
             console.log(`reported http://reddit.com${commentPair.copy.permalink}`)
           } else {
             console.log(`replied to http://reddit.com${commentPair.copy.permalink}`)
@@ -410,31 +411,29 @@ async function traverseCommentPairs(authorsData, cb) {
 }
 
 async function replyToCommentPair (commentPair) {
-  if (!commentPair.noReply) {
-    let response
-    try {
-      response = await commentPair.copy.reply(createReplyText(commentPair))
-    } catch (e) {
-      commentPair.failureReason = 'broken'
-      console.error(`couldn't post reply to: http://reddit.com${commentPair.copy.permalink}`)
-    }
-    if (response) {
-      await new Promise((resolve, reject) => {
-        setTimeout(async () => {
-          try {
-            if (await isCommentAlreadyRepliedTo(commentPair.copy, true)) {
-              commentPair.replySuccess = true
-            } else {
-              throw new Error()
-            }
-          } catch (e) {
-            commentPair.failureReason = 'broken'
-            console.error(`bot reply not retrieved on: http://reddit.com${commentPair.copy.permalink}`)
+  let response
+  try {
+    response = await commentPair.copy.reply(createReplyText(commentPair))
+  } catch (e) {
+    commentPair.failureReason = 'broken'
+    console.error(`couldn't post reply to: http://reddit.com${commentPair.copy.permalink}`)
+  }
+  if (response) {
+    await new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          if (await isCommentAlreadyRepliedTo(commentPair.copy, true)) {
+            commentPair.replySuccess = true
+          } else {
+            throw new Error()
           }
-          resolve()
-        }, 1000 * 30)
-      })
-    }
+        } catch (e) {
+          commentPair.failureReason = 'broken'
+          console.error(`bot reply not retrieved on: http://reddit.com${commentPair.copy.permalink}`)
+        }
+        resolve()
+      }, 1000 * 30)
+    })
   }
 }
 
@@ -558,7 +557,7 @@ async function updateAuthorCooldown(name, copyCount = 0) {
   })
 }
 
-async function updateCommentCooldown(id) {
+async function updateCommentCooldown({ id }) {
   const maybeComment = await getCommentCooldown({ id })
   const cooldownStart = Date.now()
 
@@ -593,6 +592,8 @@ function shouldReply (commentPair) {
 
 
 const subreddits = [
+  'tumblr',
+  'KidsAreFuckingStupid',
   'blog',
   'aww',
   'memes',
@@ -655,7 +656,7 @@ const subreddits = [
             const commentPairs = await run({ subreddit, dryRun })
             console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
             console.log(`authors:`)
-            console.log(uniqBy(commentPairs.map(cp => cp.author)))
+            uniqBy(commentPairs.map(cp => cp.author)).forEach(console.log)
             console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
             if (commentPairs.length) {
               await run({ commentPairs, dryRun })
@@ -672,14 +673,14 @@ const subreddits = [
     }
   }
 
-  run({
-    // dryRun: true,
-    // logTable: true,
-    authors: [
-      // 'SheriffComey',
-    ],
-    // subreddit: '',
-  })
+  // run({
+  //   // dryRun: true,
+  //   // logTable: true,
+  //   authors: [
+  //     'utidig73',
+  //   ],
+  //   // subreddit: '',
+  // })
 
 })()
 
