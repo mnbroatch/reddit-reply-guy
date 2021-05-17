@@ -1,5 +1,5 @@
 // TODO: error handling
-async function asyncReduce(arr, cb, initial = arr) {
+async function asyncReduce(arr = [], cb, initial = arr) {
   let acc = initial
   for (let i = 0, len = arr.length; i < len; i++) {
     const item = arr[i]
@@ -8,7 +8,7 @@ async function asyncReduce(arr, cb, initial = arr) {
   return acc
 }
 
-async function asyncFind(arr, cb) {
+async function asyncFind(arr = [], cb) {
   for (let i = 0, len = arr.length; i < len; i++) {
     const item = arr[i]
     if (await cb(item, i)) return item
@@ -17,13 +17,13 @@ async function asyncFind(arr, cb) {
 }
 
 // Discards rejected items
-async function asyncMap(arr, cb) {
+async function asyncMap(arr = [], cb) {
   return (await Promise.allSettled(arr.map(cb)))
     .map(result => result.value)
     .filter(Boolean)
 }
 
-async function asyncMapSerial(arr, cb) {
+async function asyncMapSerial(arr = [], cb) {
   const responses = []
   const arrCopy = [ ...arr ]
   while (arrCopy.length) {
@@ -32,18 +32,18 @@ async function asyncMapSerial(arr, cb) {
   return responses
 }
 
-async function asyncEvery(arr, cb) {
+async function asyncEvery(arr = [], cb) {
   return !await asyncFind(
     arr,
     async function () { return  !await cb(...arguments) }
   )
 }
 
-async function asyncSome(arr, cb) {
+async function asyncSome(arr = [], cb) {
   return !!asyncFind(arr, cb)
 }
 
-async function asyncFilter (arr, cb) {
+async function asyncFilter (arr = [], cb) {
   return (await asyncMap(
     arr,
     async function (element) {

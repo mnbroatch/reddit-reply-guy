@@ -11,7 +11,7 @@ db
   })
   .write()
 
-async function getCommentCooldown ({ id }) {
+async function getPostCooldown ({ id }) {
   return !!await db.get('commentCooldowns')
     .find({ id })
     .value()
@@ -70,7 +70,6 @@ async function cleanup(maxCommentAge) {
 
 module.exports = {
   getAuthorCooldown,
-  getCommentCooldown,
   addOrUpdateAuthorCooldown,
   addOrUpdateCommentCooldown,
   cleanup,

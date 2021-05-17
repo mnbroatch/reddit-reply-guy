@@ -1,5 +1,6 @@
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
+  'chodi',
 ]
 
 const subredditsThatDisallowUsernameLinks = [
@@ -23,7 +24,7 @@ function createReplyText (commentPair) {
 
   const originalLocation = commentPair.copy.link_id === commentPair.original.link_id
     ? 'elsewhere in this comment section.'
-    : "in a duplicate post's comment section."
+    : "in a similar post's comment section."
 
   const excuse = noLinks
     ? ' The rules of this subreddit do not allow me to link to it.'
@@ -54,10 +55,10 @@ function createTable (commentPairs) {
 }
 
 function truncate(body) {
-  const strippedBody = body.replace(/\W/g, ' ')
-  return strippedBody.length > 30
-    ? strippedBody.slice(0, 30) + '...'
-    : strippedBody
+  const escapedBody = body.replace(/\W/g, "\\$&").replace(/\n/g, ' ')
+  return escapedBody.length > 30
+    ? escapedBody.slice(0, 30) + '...'
+    : escapedBody
 }
 
 module.exports = {
