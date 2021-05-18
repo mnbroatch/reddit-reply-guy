@@ -7,12 +7,12 @@ const subredditsThatDisallowUsernameLinks = [
   'politics',
 ]
 
-function createReportText(commentPair) {
-  return `Copies ${commentPair.original.permalink}`
+function createReportText(plagiarismCase) {
+  return `Copies ${plagiarismCase.original.permalink}`
 }
 
-function createReplyText (commentPair) {
-  const subreddit = commentPair.original.subreddit.display_name
+function createReplyText (plagiarismCase) {
+  const subreddit = plagiarismCase.original.subreddit.display_name
   const noLinks = subredditsThatDisallowLinks
     .find(sub => sub.toLowerCase() === subreddit.toLowerCase())
   const noUsernameLinks = noLinks || subredditsThatDisallowUsernameLinks
@@ -20,9 +20,9 @@ function createReplyText (commentPair) {
 
   const original = noLinks
     ? 'another'
-    : `[this one](http://np.reddit.com${commentPair.original.permalink})`
+    : `[this one](http://np.reddit.com${plagiarismCase.original.permalink})`
 
-  const originalLocation = commentPair.copy.link_id === commentPair.original.link_id
+  const originalLocation = plagiarismCase.copy.link_id === plagiarismCase.original.link_id
     ? 'elsewhere in this comment section.'
     : "in a similar post's comment section."
 
@@ -34,11 +34,11 @@ function createReplyText (commentPair) {
     ? '.'
     : `:
 
-${createTable(commentPair.additional)}`
+${createTable(plagiarismCase.additional)}`
 
   const username = noUsernameLinks
     ? 'the user above'
-    : ` [/u/${commentPair.copy.author.name}](https://np.reddit.com/u/${commentPair.copy.author.name}/)`
+    : ` [/u/${plagiarismCase.author}](https://np.reddit.com/u/${plagiarismCase.author}/)`
 
   return `The above comment was stolen from ${original} ${originalLocation}${excuse}
 
@@ -47,10 +47,10 @@ It is probably not a coincidence, because this user has done it before${addition
 beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
 }
 
-function createTable (commentPairs) {
+function createTable (plagiarismCases) {
   return `Original | Plagiarized\n-------- | -----------`
-    + commentPairs.reduce((acc, commentPair) =>
-      acc + `\n[${truncate(commentPair.original.body)}](http://np.reddit.com${commentPair.original.permalink}) | [${truncate(commentPair.copy.body)}](http://np.reddit.com${commentPair.copy.permalink})`
+    + plagiarismCases.reduce((acc, plagiarismCase) =>
+      acc + `\n[${truncate(plagiarismCase.original.body)}](http://np.reddit.com${plagiarismCase.original.permalink}) | [${truncate(plagiarismCase.copy.body)}](http://np.reddit.com${plagiarismCase.copy.permalink})`
       , '')
 }
 

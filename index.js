@@ -27,6 +27,29 @@ try {
 } catch (e) {}
 
 const subreddits = [
+  'relationships',
+  'politics',
+  'leagueoflegends',
+  'Tinder',
+  'news',
+  'me_irl',
+  'WhitePeopleTwitter',
+  'happycowgifs',
+  'cats',
+  'instant_regret',
+  'science',
+  'Music',
+  'Genshin_Impact',
+  'movies',
+  'PoliticalHumor',
+  'Art',
+  'tumblr',
+  'KidsAreFuckingStupid',
+  'reverseanimalrescue',
+  'dataisbeautiful',
+  'nonononoyes',
+  'OldSchoolCool',
+  'ShowerThoughts',
   'aww',
   'DIY',
   'LifeProTips',
@@ -54,46 +77,9 @@ const subreddits = [
   'forbiddensnacks',
   'Overwatch',
   'interestingasfuck',
-  'relationships',
-  'politics',
-  'leagueoflegends',
-  'Tinder',
-  'news',
-  'me_irl',
-  'WhitePeopleTwitter',
-  'happycowgifs',
-  'cats',
-  'instant_regret',
-  'science',
-  'Music',
-  'Genshin_Impact',
-  'movies',
-  'PoliticalHumor',
-  'Art',
-  'tumblr',
-  'KidsAreFuckingStupid',
-  'reverseanimalrescue',
-  'dataisbeautiful',
-  'nonononoyes',
-  'OldSchoolCool',
-  'ShowerThoughts',
 ]
 
 const subredditsThatDisallowBots = [
-  'Minecraft',
-  'gratefuldead',
-  'ich_iel',
-  'FairyTaleAsFuck',
-  'askscience',
-  'texas',
-  'Republican',
-  'OldPhotosInRealLife',
-  'cars',
-  'sweden',
-  'Israel',
-  'Arkansas',
-  'MakeMeSuffer',
-  'barkour',
   'funny',
   'Futurology',
   'Gaming',
@@ -110,20 +96,42 @@ const subredditsThatDisallowBots = [
   'todayilearned',
   'sports',
   'politics',
+  'Minecraft',
+  'gratefuldead',
+  'ich_iel',
+  'FairyTaleAsFuck',
+  'askscience',
+  'texas',
+  'Republican',
+  'OldPhotosInRealLife',
+  'cars',
+  'sweden',
+  'Israel',
+  'Arkansas',
+  'MakeMeSuffer',
+  'barkour',
 ]
 
 async function run ({
-  author,
-  authors = author ? [ author ] : [],
   dryRun,
   printTable,
+  author,
+  authors = author ? [ author ] : [],
   subreddit,
   subreddits = subreddit ? [ subreddit ] : [],
+  postId,
+  postIds = postId ? [ postId ] : [],
+  initialPlagiarismCases = []
 }) {
   const data = new Data()
 
   authors.length && console.log(`searching authors: ${authors}`)
   subreddits.length && console.log(`searching subreddits: ${subreddits}`)
+  postIds.length && console.log(`searching postIds: ${postIds}`)
+
+  ;(await asyncMap(postIds, api.getPost))
+    .flat()
+    .forEach(data.setPost)
 
   ;(await asyncMap(subreddits, api.getSubredditPosts))
     .flat()
@@ -146,63 +154,72 @@ async function run ({
     }
   )
 
-  ;(await asyncMap(
+  console.log('num posts before dupe search: ', data.getAllPosts().length)
+  await asyncMap(
     data.getAllPosts(),
     async (post) => {
       const duplicatePostIds = await api.getDuplicatePostIds(post)
-      return asyncMap(
+      console.log('duplicatePostIds', duplicatePostIds)
+      data.setPost({
+        ...post,
+        duplicatePostIds,
+      })
+      await asyncMap(
         duplicatePostIds,
         async (dupeId) => {
           const dupe = data.getPost(dupeId) || await api.getPost(dupeId)
           data.setPost({
-            ...post,
+            ...dupe,
             duplicatePostIds,
           })
         }
       )
     }
-  ))
-  console.log('data.getAllPosts()', data.getAllPosts().length)
-  const plagiarismCases = findPlagiarismCases(data.getAllPosts())
+  )
+
+  console.log('num posts after dupe search: ', data.getAllPosts().length)
+  const plagiarismCases = [ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ]
   console.log('plagiarismCases.length', plagiarismCases.length)
 
-  const plagiarismCasesPerAuthor = Object.values(
-    groupBy(plagiarismCases, 'author')
-  )
-    .filter(authorCommentPairs => authorCommentPairs.length >= MIN_PLAGIARIST_CASES)
-
+  const plagiarismCasesPerAuthor = Object.values(groupBy(plagiarismCases, 'author'))
+    .map(authorPlagiarismCases => authorPlagiarismCases.map(plagiarismCase => ({
+      ...plagiarismCase,
+      additional: authorPlagiarismCases.filter(pc => pc!== plagiarismCase)
+    })))
+    
   if (printTable) {
     printTables(plagiarismCasesPerAuthor)
   }
 
   await asyncMap(
-    await asyncFilter(
-      plagiarismCasesPerAuthor,
-      plagiarismCaseFilter
-    ),
-    async (plagiarismCase) => {
-      if (dryRun) return
+    plagiarismCasesPerAuthor
+      .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES),
+    async authorPlagiarismCases => asyncMap(
+      await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
+      async (plagiarismCase) => {
+        console.log(`http://reddit.com${plagiarismCase.copy.permalink}`)
+        if (dryRun) return
 
-      await api.report(createReportText)
+        await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
 
-      if (shouldReply(plagiarismCase)) {
-        await api.reply(createReplyText)
-        await new Promise((resolve, reject) => {
-          setTimeout(async () => {
-            if (!await api.isCommentAlreadyRepliedTo(comment)) {
-              throw new Error()
-            }
-            resolve()
-          }, 1000 * 30)
-        })
+        if (shouldReply(plagiarismCase)) {
+          await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
+          await new Promise((resolve, reject) => {
+            setTimeout(async () => {
+              if (!await api.isCommentAlreadyRepliedTo(plagiarismCase.copy)) {
+                throw new Error()
+              }
+              resolve()
+            }, 1000 * 30)
+          })
+        }
       }
-    }
+    )
   )
 
-  // These comment pairs haven't had their author searched yet
+  // These plagiarism cases haven't had their author searched yet
   return plagiarismCases
-    .map(plagiarismCase => plagiarismCase.author)
-    .filter(author => !authors.includes(author))
+    .map(plagiarismCase => !authors.includes(plagiarismCase.author))
 }
 
 function shouldReply (plagiarismCase) {
@@ -222,26 +239,32 @@ async function printTables (plagiarismCasesPerAuthor) {
 }
 
 ;(async function () {
-  let dryRun = true
-  let printTable = true
+  let dryRun
+  let printTable
+  printTable = true
+  // dryRun = true
+
+  // await run({
+  //   postId: 'cgge03',
+  //   dryRun,
+  //   printTable
+  // })
+  
+  let initialPlagiarismCases = []
   while (true) {
     try {
       await asyncMapSerial(
         subreddits,
         async (subreddit) => {
           try {
-            const authors = await run({
+
+            initialPlagiarismCases = await run({
               subreddit,
+              initialPlagiarismCases,
               dryRun,
               printTable
             })
-            if (authors.length) {
-              await run({
-                authors,
-                dryRun,
-                printTable
-              })
-            }
+
           } catch (e) {
             console.error(`something went wrong:`)
             console.error(e)
@@ -253,6 +276,7 @@ async function printTables (plagiarismCasesPerAuthor) {
       console.error(e)
     }
   }
+
 })()
 
 module.exports = run

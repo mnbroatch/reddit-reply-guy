@@ -6,6 +6,8 @@ const commentFilter = require('./comment-filter')
 const commentPairFilter = require('./comment-pair-filter')
 
 module.exports = function findPlagiarismCases (posts) {
+  console.log('-------------')
+
   const commentsPerPostWithDupes = Object.values(
     groupBy(
       posts,
@@ -14,11 +16,10 @@ module.exports = function findPlagiarismCases (posts) {
   ) 
     .map(posts => posts.map(post => post.comments).flat())
 
+  console.log('commentsPerPostWithDupes.length', commentsPerPostWithDupes.length)
+
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     const commentsByBody = groupCommentsBySimilarBody(comments.filter(commentFilter))
-    console.log('-----')
-    console.log('comments.filter(commentFilter).length', comments.filter(commentFilter).length)
-    console.log('Object.keys(commentsByBody).length', Object.keys(commentsByBody).length)
     // If there are more matches than that, could be memery.
     // If bots start double posting, bump this filter up.
     return Object.values(commentsByBody)

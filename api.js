@@ -1,6 +1,7 @@
 const axios = require('axios')
 const Snoowrap = require('snoowrap')
 const NodeCache = require('node-cache')
+const uniqBy = require('lodash/uniqBy')
 const Post = require('./post')
 const {
   asyncMap,
@@ -10,27 +11,33 @@ const {
   asyncFind,
 } = require('./async-array-helpers')
 
+// var http = require('http-debug').http
+// var https = require('http-debug').https
+// http.debug = 1
+// https.debug = 1
+
+const INITIAL_POST_LIMIT = +process.env.INITIAL_POST_LIMIT 
+const AUTHOR_POST_LIMIT = +process.env.AUTHOR_POST_LIMIT
+const REPLY_BOT_USERS = JSON.parse(process.env.REPLY_BOT_USERS)
+
 const {
   CLIENT_ID,
   CLIENT_SECRET,
   REDDIT_USER,
   REDDIT_PASS,
+  USER_AGENT,
 } = process.env
-const INITIAL_POST_LIMIT = +process.env.INITIAL_POST_LIMIT 
-const AUTHOR_POST_LIMIT = +process.env.AUTHOR_POST_LIMIT
-const REPLY_BOT_USERS = JSON.parse(process.env.REPLY_BOT_USERS)
-
 const snoowrap = new Snoowrap({
-  userAgent: REDDIT_USER,
+  userAgent: USER_AGENT,
   clientId: CLIENT_ID,
   clientSecret: CLIENT_SECRET,
   username: REDDIT_USER,
   password: REDDIT_PASS
 })
-
 snoowrap.config({
   continueAfterRatelimitError: true,
   requestDelay: 1000,
+  debug: true,
 })
 
 class Api {
@@ -69,7 +76,7 @@ class Api {
     if (maybePost) {
       return maybePost
     } else {
-      console.log(`getting post: ${postId}`)
+      // console.log(`getting post: ${postId}`)
       const post = await snoowrap.getSubmission(postId)
       return this.cachePost(
         postId,
@@ -85,7 +92,7 @@ class Api {
   }
 
   async getSubredditPosts (subreddit) {
-    console.log(`getting posts from subreddit: ${subreddit}`)
+    // console.log(`getting posts from subreddit: ${subreddit}`)
     return asyncMap(
       await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT }),
       post => this.getPost(post.id)
@@ -93,18 +100,16 @@ class Api {
   }
 
   getAuthorComments (author) {
-    console.log(`getting comments from author: ${author}`)
+    // console.log(`getting comments from author: ${author}`)
     return snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
   }
 
   async isCommentAlreadyRepliedTo(comment) {
-    console.log(`checking reply status of comment: ${comment.id}`)
     return comment.replyAuthors.some(
-        author => REPLY_BOT_USERS.some(
-          user => user.toLowerCase() === author.toLowerCase() 
-        )
+      author => REPLY_BOT_USERS.some(
+        user => user.toLowerCase() === author.toLowerCase() 
       )
-    || (await snoowrap.getComment(comment.id).expandReplies({ depth: 1 }).replies)
+    ) || (await snoowrap.getComment(comment.id).expandReplies({ depth: 1 }).replies)
       .some(
         reply => REPLY_BOT_USERS.some(
           user => user.toLowerCase() === reply.author.name.toLowerCase() 
@@ -113,6 +118,7 @@ class Api {
   }
 
   async getDuplicatePostIds(post) {
+    try {
     let duplicatePostIds = []
     if (canTryImageSearch(post)) {
       console.log(`trying image search on post: ${post.id}`)
@@ -121,14 +127,14 @@ class Api {
           `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`
         ))
           .data.matches.map(match => match.post.post_id)
-          .concat(post.id)
       } catch (e) { }
     }
 
-    // We should see if it's worth always
-    // checking both places
-    if (!duplicatePostIds.length) {
-      console.log(`getting duplicates for: ${post.id}`)
+    // We should see if it's worth always checking both places
+    // If there are too many hits from the image search, use this.
+    // An example would be chess gifs; lots of false positives
+    if (!duplicatePostIds.length || duplicatePostIds.length > 20) {
+      // console.log(`getting duplicates for: ${post.id}`)
       duplicatePostIds = await asyncMap(
         await snoowrap.oauthRequest({
           uri: '/api/info',
@@ -141,9 +147,10 @@ class Api {
       )
     }
 
-    return duplicatePostIds.length
-      ? duplicatePostIds
-      : [ post.id ]
+    return uniqBy([ ...duplicatePostIds, post.id ])
+    } catch (e) {
+      console.log('e', e)
+    }
   }
 
   // subject to breaking with snoowrap updates
@@ -176,4 +183,6 @@ function canTryImageSearch(post) {
     && !post.removed_by_category
 }
 
-module.exports = new Api()
+const api = new Api()
+
+module.exports = api
