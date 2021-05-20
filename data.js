@@ -14,6 +14,9 @@ module.exports = class Data {
   }
 
   setPost(post) {
+    if (!post) {
+      console.log('post missing!')
+    }
     this.posts[post.id] = new Post(post)
   }
 

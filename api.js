@@ -3,6 +3,7 @@ const Snoowrap = require('snoowrap')
 const NodeCache = require('node-cache')
 const uniqBy = require('lodash/uniqBy')
 const Post = require('./post')
+const stripComment = require('./strip-comment')
 const {
   asyncMap,
   asyncMapSerial,
@@ -37,88 +38,105 @@ const snoowrap = new Snoowrap({
 snoowrap.config({
   continueAfterRatelimitError: true,
   requestDelay: 1000,
-  debug: true,
+  // debug: true,
 })
 
 class Api {
   constructor() {
-    [
-      'getPost',
-      'getSubredditPosts',
-      'cachePost',
-      'isCommentAlreadyRepliedTo',
-    ].forEach((functionName) => {
-      this[functionName] = this[functionName].bind(this)
+    this.cache = new NodeCache({
+      stdTTL: 60 * 60,
+      useClones: false
     })
+    this.getSubredditPosts = this.getSubredditPosts.bind(this)
 
-    this.cache = new NodeCache({ stdTTL: 60 * 60 })
-  }
-
-  async cachePost (id, postOrPromise) {
-    const postPromise = Promise.resolve(postOrPromise).then(post => new Post(post))
-
-    this.cache.set(
-      id,
-      postPromise
-    )
-
-    // overwrite promise in the cache for serializing for backup
-    this.cache.set(
-      id,
-      await postPromise
-    )
-
-    return postPromise
+    //  cache promise to handle parallel requests.
+    //  replace promise with actual value for serialization
+    ;[
+      'getPost',
+      'getAuthorComments',
+      'getDuplicatePostIds',
+    ].forEach((functionName) => {
+      const func = this[functionName].bind(this)
+      this[functionName] = (async function () {
+        const cacheKey = `${functionName}:${JSON.stringify(arguments)}`
+        const maybeResult = await this.cache.get(cacheKey)
+        if (maybeResult) {
+          return maybeResult
+        } else {
+          const resultPromise = func(...arguments)
+          this.cache.set(
+            cacheKey,
+            resultPromise
+          )
+          this.cache.set(
+            cacheKey,
+            await resultPromise
+          )
+          return resultPromise
+        }
+      }).bind(this)
+    })
   }
 
   async getPost (postId) {
-    const maybePost = this.cache.get(postId)
-    if (maybePost) {
-      return maybePost
-    } else {
-      // console.log(`getting post: ${postId}`)
+    try {
       const post = await snoowrap.getSubmission(postId)
-      return this.cachePost(
-        postId,
-        {
-          id: await post.id,
-          comments: await post.comments,
-          post_hint: await post.post_hint,
-          domain: await post.domain,
-          removed_by_category: await post.removed_by_category,
-        }
-      )
+      const unwrappedPost = {
+        id: await post.id,
+        comments: await post.comments,
+        post_hint: await post.post_hint,
+        domain: await post.domain,
+        removed_by_category: await post.removed_by_category,
+      }
+      return new Post(unwrappedPost)
+    } catch (e) {
+      return null
     }
   }
 
   async getSubredditPosts (subreddit) {
-    // console.log(`getting posts from subreddit: ${subreddit}`)
-    return asyncMap(
-      await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT }),
-      post => this.getPost(post.id)
-    )
+    try {
+      console.log(`getting posts from subreddit: ${subreddit}`)
+      return asyncMap(
+        await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT }),
+        post => this.getPost(post.id)
+      )
+    } catch (e) {
+      console.log('e1', e)
+      return []
+    }
   }
 
-  getAuthorComments (author) {
-    // console.log(`getting comments from author: ${author}`)
-    return snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
+  async getAuthorComments (author) {
+    try {
+      console.log(`getting comments from author: ${author}`)
+      return await snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
+        .map(stripComment)
+    } catch (e) {
+      console.log(`couldn't get comments by: ${author}`)
+      return []
+    }
   }
 
   async isCommentAlreadyRepliedTo(comment) {
-    return comment.replyAuthors.some(
-      author => REPLY_BOT_USERS.some(
-        user => user.toLowerCase() === author.toLowerCase() 
-      )
-    ) || (await snoowrap.getComment(comment.id).expandReplies({ depth: 1 }).replies)
-      .some(
-        reply => REPLY_BOT_USERS.some(
-          user => user.toLowerCase() === reply.author.name.toLowerCase() 
+    try {
+      return comment.replyAuthors.some(
+        author => REPLY_BOT_USERS.some(
+          user => user.toLowerCase() === author.toLowerCase() 
         )
-      )
+      ) || (await snoowrap.getComment(comment.id).expandReplies({ depth: 1 }).replies)
+        .some(
+          reply => REPLY_BOT_USERS.some(
+            user => user.toLowerCase() === reply.author.name.toLowerCase() 
+          )
+        )
+    } catch (e) {
+      console.log(`couldn't get replies for comment: ${comment}`)
+      return true
+    }
   }
 
   async getDuplicatePostIds(post) {
-    try {
     let duplicatePostIds = []
     if (canTryImageSearch(post)) {
       console.log(`trying image search on post: ${post.id}`)
@@ -134,46 +152,52 @@ class Api {
     // If there are too many hits from the image search, use this.
     // An example would be chess gifs; lots of false positives
     if (!duplicatePostIds.length || duplicatePostIds.length > 20) {
-      // console.log(`getting duplicates for: ${post.id}`)
-      duplicatePostIds = await asyncMap(
-        await snoowrap.oauthRequest({
-          uri: '/api/info',
-          method: 'get',
-          qs: {
-            url: await post.url,
-          }
-        }),
-        dupeMeta => dupeMeta.id
-      )
+      try {
+        duplicatePostIds = await asyncMap(
+          await snoowrap.oauthRequest({
+            uri: '/api/info',
+            method: 'get',
+            qs: {
+              url: await post.url,
+            }
+          }),
+          dupeMeta => dupeMeta.id
+        )
+      } catch (e) { }
     }
 
     return uniqBy([ ...duplicatePostIds, post.id ])
-    } catch (e) {
-      console.log('e', e)
-    }
   }
 
   // subject to breaking with snoowrap updates
   async reportComment (comment, message) {
     console.log(`reporting comment: ${comment.id}`)
-    await ({
-      ...comment,
-      _r: snoowrap,
-      _post: Snoowrap.objects.ReplyableContent.prototype._post,
-      report: Snoowrap.objects.ReplyableContent.prototype.report,
-    })
-      .report(message)
+    try {
+      await ({
+        ...comment,
+        _r: snoowrap,
+        _post: Snoowrap.objects.ReplyableContent.prototype._post,
+        report: Snoowrap.objects.ReplyableContent.prototype.report,
+      })
+        .report(message)
+    } catch (e) {
+      console.log('e', e)
+    }
   }
 
   async replyToComment (comment, message) {
     console.log(`replying to comment: ${comment.id}`)
-    await ({
-      ...comment,
-      _r: snoowrap,
-      _post: Snoowrap.objects.ReplyableContent.prototype._post,
-      reply: Snoowrap.objects.ReplyableContent.prototype.reply,
-    }) 
-      .reply(message)
+    try {
+      await ({
+        ...comment,
+        _r: snoowrap,
+        _post: Snoowrap.objects.ReplyableContent.prototype._post,
+        reply: Snoowrap.objects.ReplyableContent.prototype.reply,
+      }) 
+        .reply(message)
+    } catch (e) {
+      console.log('e', e)
+    }
   }
 }
 

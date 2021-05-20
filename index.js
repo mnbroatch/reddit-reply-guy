@@ -21,20 +21,13 @@ const {
 } = require('./async-array-helpers')
 
 const MIN_PLAGIARIST_CASES = +process.env.MIN_PLAGIARIST_CASES
+const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
 
 try {
   api.cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
 } catch (e) {}
 
 const subreddits = [
-  'relationships',
-  'politics',
-  'leagueoflegends',
-  'Tinder',
-  'news',
-  'me_irl',
-  'WhitePeopleTwitter',
-  'happycowgifs',
   'cats',
   'instant_regret',
   'science',
@@ -77,6 +70,14 @@ const subreddits = [
   'forbiddensnacks',
   'Overwatch',
   'interestingasfuck',
+  'relationships',
+  'politics',
+  'leagueoflegends',
+  'Tinder',
+  'news',
+  'me_irl',
+  'WhitePeopleTwitter',
+  'happycowgifs',
 ]
 
 const subredditsThatDisallowBots = [
@@ -137,20 +138,32 @@ async function run ({
     .flat()
     .forEach(data.setPost)
 
+  const commentsPerAuthor = (await asyncMap(uniqBy(authors), api.getAuthorComments))
+    .filter((authorComments) => {// ignore inactive authors
+      try {
+        return authorComments.sort((a, b) => b.created - a.created)[0]?.created * 1000 > Date.now() - MAX_COMMENT_AGE
+      } catch (e) {
+        console.log('authorComments', authorComments)
+        console.log('e', e)
+      }
+    })
+
   await asyncMap(
     Object.entries(groupBy(
-      (await asyncMap(authors, api.getAuthorComments)).flat(),
+      (commentsPerAuthor).flat(),
       'link_id'
     )),
     async ([postId, comments]) => {
       const post = data.getPost(postId) || await api.getPost(postId)
-      data.setPost({
-        ...post,
-        comments: uniqBy(
-          [ ...post.comments, ...comments ],
-          'id'
-        )
-      })
+      if (post) {
+        data.setPost({
+          ...post,
+          comments: uniqBy(
+            [ ...post.comments, ...comments ],
+            'id'
+          )
+        })
+      }
     }
   )
 
@@ -159,7 +172,6 @@ async function run ({
     data.getAllPosts(),
     async (post) => {
       const duplicatePostIds = await api.getDuplicatePostIds(post)
-      console.log('duplicatePostIds', duplicatePostIds)
       data.setPost({
         ...post,
         duplicatePostIds,
@@ -168,17 +180,19 @@ async function run ({
         duplicatePostIds,
         async (dupeId) => {
           const dupe = data.getPost(dupeId) || await api.getPost(dupeId)
-          data.setPost({
-            ...dupe,
-            duplicatePostIds,
-          })
+          if (dupe) {
+            data.setPost({
+              ...dupe,
+              duplicatePostIds,
+            })
+          }
         }
       )
     }
   )
 
   console.log('num posts after dupe search: ', data.getAllPosts().length)
-  const plagiarismCases = [ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ]
+  const plagiarismCases = uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id')
   console.log('plagiarismCases.length', plagiarismCases.length)
 
   const plagiarismCasesPerAuthor = Object.values(groupBy(plagiarismCases, 'author'))
@@ -197,7 +211,6 @@ async function run ({
     async authorPlagiarismCases => asyncMap(
       await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
       async (plagiarismCase) => {
-        console.log(`http://reddit.com${plagiarismCase.copy.permalink}`)
         if (dryRun) return
 
         await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
@@ -207,7 +220,7 @@ async function run ({
           await new Promise((resolve, reject) => {
             setTimeout(async () => {
               if (!await api.isCommentAlreadyRepliedTo(plagiarismCase.copy)) {
-                throw new Error()
+                console.log(`reply not showing up: http://reddit.com${plagiarismCase.copy.permalink}`)
               }
               resolve()
             }, 1000 * 30)
@@ -218,8 +231,13 @@ async function run ({
   )
 
   // These plagiarism cases haven't had their author searched yet
-  return plagiarismCases
-    .map(plagiarismCase => !authors.includes(plagiarismCase.author))
+  const remainderPlagiarismCases = plagiarismCases.filter(plagiarismCase => !authors.includes(plagiarismCase.author))
+  const remainderAuthors = remainderPlagiarismCases.map(plagiarismCase => plagiarismCase.author)
+
+  return {
+    plagiarismCases: remainderPlagiarismCases,
+    authors: remainderAuthors,
+  }
 }
 
 function shouldReply (plagiarismCase) {
@@ -238,54 +256,63 @@ async function printTables (plagiarismCasesPerAuthor) {
   })
 }
 
+let dryRun
+let printTable
+printTable = true
+dryRun = true
+
 ;(async function () {
-  let dryRun
-  let printTable
-  printTable = true
-  // dryRun = true
 
-  // await run({
-  //   postId: 'cgge03',
-  //   dryRun,
-  //   printTable
-  // })
-  
-  let initialPlagiarismCases = []
-  while (true) {
-    try {
-      await asyncMapSerial(
-        subreddits,
-        async (subreddit) => {
-          try {
+  // try {
+  //
+  //   let plagiarismCases = []
+  //   let authors = []
+  //   while (true) {
+  //     try {
+  //       await asyncMapSerial(
+  //         subreddits,
+  //         async (subreddit) => {
+  //           try {
+  //
+  //             const remainder = await run({
+  //               subreddit,
+  //               plagiarismCases,
+  //               authors,
+  //               dryRun,
+  //               printTable
+  //             })
+  //             plagiarismCases = remainder.plagiarismCases
+  //             authors = remainder.authors
+  //
+  //           } catch (e) {
+  //             console.error(`something went wrong:`)
+  //             console.error(e)
+  //           }
+  //         }
+  //       )
+  //     } catch (e) {
+  //       console.error(`something went wrong:`)
+  //       console.error(e)
+  //     }
+  //   }
+  // } catch (e) {
+  //   console.log('e', e)
+  // }
 
-            initialPlagiarismCases = await run({
-              subreddit,
-              initialPlagiarismCases,
-              dryRun,
-              printTable
-            })
-
-          } catch (e) {
-            console.error(`something went wrong:`)
-            console.error(e)
-          }
-        }
-      )
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
-  }
+  await run({
+    author: 'strawberrylynx',
+    dryRun,
+    printTable
+  })
 
 })()
 
 module.exports = run
 
 ;[`SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`].forEach((eventType) => {
-  process.on(eventType, process.exit);
-})
-
-process.on('exit', () => {
-  console.log('goodbye')
-  fs.writeFileSync('./db/cache-backup.json', JSON.stringify(api.cache.data))
+  process.on(eventType, () => {
+    console.log('goodbye')
+    fs.writeFileSync('./db/cache-backup.json', JSON.stringify(api.cache.data))
+    process.exit()
+  })
 })

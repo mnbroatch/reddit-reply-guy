@@ -1,4 +1,5 @@
 const uniqBy = require('lodash/uniqBy')
+const stripComment = require('./strip-comment')
 
 module.exports = class Post {
   constructor({
@@ -18,33 +19,8 @@ module.exports = class Post {
   }
 }
 
-function stripComment({
-  id,
-  name,
-  body,
-  created,
-  author,
-  permalink,
-  link_id,
-  parent_id,
-  subreddit,
-  replies = [],
-}) {
-  return {
-    id,
-    name,
-    body,
-    created,
-    author,
-    permalink,
-    link_id,
-    parent_id,
-    subreddit,
-    replyAuthors: [ ...replies.map(({ author }) => ({ author: author.name })) ],
-  }
-}
-
 function flattenComments(comments) {
+  try {
   return uniqBy(comments.reduce((acc, comment) => {
     if (!comment.replies?.length) {
       return [ ...acc, comment ]
@@ -53,4 +29,8 @@ function flattenComments(comments) {
       return [ ...acc, comment, ...flattenComments(comment.replies) ]
     }
   }, []), 'id')
+  } catch (e) {
+    console.log(arguments)
+    console.log('e', e)
+  }
 }

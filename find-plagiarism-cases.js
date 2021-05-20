@@ -6,8 +6,6 @@ const commentFilter = require('./comment-filter')
 const commentPairFilter = require('./comment-pair-filter')
 
 module.exports = function findPlagiarismCases (posts) {
-  console.log('-------------')
-
   const commentsPerPostWithDupes = Object.values(
     groupBy(
       posts,
@@ -16,9 +14,10 @@ module.exports = function findPlagiarismCases (posts) {
   ) 
     .map(posts => posts.map(post => post.comments).flat())
 
-  console.log('commentsPerPostWithDupes.length', commentsPerPostWithDupes.length)
+  console.log(`searching ${commentsPerPostWithDupes.length} posts`)
 
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
+    console.log(`searching post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments.filter(commentFilter))
     // If there are more matches than that, could be memery.
     // If bots start double posting, bump this filter up.
@@ -44,19 +43,21 @@ module.exports = function findPlagiarismCases (posts) {
     'author.name'
   )
   const repetitiveComments = Object.values(commentsByPlagiarist)
-    .reduce((acc, plagiaristComments) => {
-      const repetitiveComments = Object.values(groupCommentsBySimilarBody(plagiaristComments))
-        .filter(similarComments => similarComments.length > 1)
-      return [ ...acc, ...repetitiveComments ]
-    }, [])
+    .map((plagiaristComments) => Object.values(groupCommentsBySimilarBody(plagiaristComments, .7))
+      .filter(similarComments => similarComments.length > 1)
+      .flat()
+    ).flat()
 
   return maybePlagiarismCases
-    .filter(plagiarismCase => !repetitiveComments.some(c => c.id === plagiarismCase.copy.id))
+    .filter(plagiarismCase => {
+      console.log('plagiarismCase.copy.id', plagiarismCase.copy.id)
+      !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id))
+    })
 }
 
-function groupCommentsBySimilarBody (comments) {
+function groupCommentsBySimilarBody (comments, threshold = .85) {
   return comments.reduce((acc, comment) => {
-    const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body))
+    const maybeKey = Object.keys(acc).find(body => isSimilar(comment.body, body, threshold))
     return maybeKey
       ? { ...acc, [maybeKey]: [ ...acc[maybeKey], comment ] }
       : { ...acc, [comment.body]: [comment] }
