@@ -29,12 +29,6 @@ try {
 } catch (e) {}
 
 const subreddits = [
-  'relationships',
-  'politics',
-  'leagueoflegends',
-  'Tinder',
-  'news',
-  'me_irl',
   'WhitePeopleTwitter',
   'happycowgifs',
   'cats',
@@ -79,6 +73,12 @@ const subreddits = [
   'forbiddensnacks',
   'Overwatch',
   'interestingasfuck',
+  'relationships',
+  'politics',
+  'leagueoflegends',
+  'Tinder',
+  'news',
+  'me_irl',
 ]
 
 const subredditsThatDisallowBots = [
@@ -318,7 +318,7 @@ module.exports = run
     console.log('goodbye')
     const cacheToSave = pickBy(
       api.cache.data,
-      value => !value.v instanceof Promise
+      value => Object.prototype.toString.call(value.v) !== '[object Promise]'
     )
     fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))
     process.exit()
