@@ -1,6 +1,7 @@
 require('dotenv').config()
 const fs = require('fs')
 const api = require('./api')
+const cache = require('./cache')
 const Data = require('./data')
 const uniqBy = require('lodash/uniqBy')
 const groupBy = require('lodash/groupBy')
@@ -25,11 +26,10 @@ const MIN_PLAGIARIST_CASES = +process.env.MIN_PLAGIARIST_CASES
 const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
 
 try {
-  api.cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
+  cache._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
 } catch (e) {}
 
 const subreddits = [
-  'food',
   'todayilearned',
   'madlads',
   'tifu',
@@ -79,6 +79,7 @@ const subreddits = [
   'funny',
   'memes',
   'gaming',
+  'food',
 ]
 
 const subredditsThatDisallowBots = [
@@ -201,7 +202,8 @@ async function run ({
   const plagiarismCases = uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id')
   console.log('plagiarismCases.length', plagiarismCases.length)
 
-  const plagiarismCasesPerAuthor = Object.values(groupBy(plagiarismCases, 'author'))
+  const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
+  const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)
     .map(authorPlagiarismCases => authorPlagiarismCases.map(plagiarismCase => ({
       ...plagiarismCase,
       additional: authorPlagiarismCases.filter(pc => pc!== plagiarismCase)
@@ -242,19 +244,38 @@ async function run ({
     )
   )
 
-  // These plagiarism cases haven't had their author searched yet
-  const remainderPlagiarismCases = plagiarismCases.filter(plagiarismCase => !authors.includes(plagiarismCase.author))
+  // Carry over some of the cases whose authors we haven't investigated fully.
+  // Only carry over least recently searched authors and cases.
+  const { remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor } = groupBy(
+    plagiarismCasesPerAuthor,
+    authorPlagiarismCases => authors.includes(authorPlagiarismCases[0].author) ? 'searchedPlagiarismCasesPerAuthor' : 'remainderPlagiarismCasesPerAuthor'
+  )
+  console.log('remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor ', remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor )
+  await asyncMap(
+    searchedPlagiarismCasesPerAuthor,
+    async authorPlagiarismCases => {
+      console.log('authorPlagiarismCases[0].author', authorPlagiarismCases[0].author)
+      await cache.set(`author:${authorPlagiarismCases[0].author}:last-searched`, Date.now(), 0)
+    }
+  )
 
-  // We will 
+  const remainderAuthorsLastSearched = await asyncMap(
+    remainderPlagiarismCasesPerAuthor,
+    async authorPlagiarismCases => ({
+      author: authorPlagiarismCases[0].author,
+      lastSearched: await cache.get(`author:${authorPlagiarismCases[0].author}:last-searched`)
+    })
+  )
+
+  console.log('remainderAuthorsLastSearched', remainderAuthorsLastSearched)
+
   const authorsToReturn = uniqBy(
-    remainderPlagiarismCases
-      .sort((a, b) => remainderPlagiarismCasesByAuthor[b.author].length - remainderPlagiarismCasesByAuthor[a.author].length
-        || b.copy.created - a.copy.created
-      )
+    remainderAuthorsLastSearched
+      .sort((a, b) => b.lastSearched - a.lastSearched)
       .map(plagiarismCase => plagiarismCase.author)
   ).slice(0, 20)
 
-  const plagiarismCasesToReturn = authorsToReturn.map(author => remainderPlagiarismCasesByAuthor[author]).flat()
+  const plagiarismCasesToReturn = authorsToReturn.map(author => plagiarismCasesByAuthor[author]).flat()
 
   return {
     plagiarismCases: plagiarismCasesToReturn,
@@ -312,7 +333,7 @@ printTable = true
   }
 
   // await run({
-  //   author: 'porkinfielder',
+  //   author: 'Tasty-Replacement',
   //   dryRun,
   //   printTable
   // })
@@ -325,7 +346,7 @@ module.exports = run
   process.on(eventType, () => {
     console.log('goodbye')
     const cacheToSave = pickBy(
-      api.cache.data,
+      cache._cache.data,
       value => Object.prototype.toString.call(value.v) !== '[object Promise]'
     )
     fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))

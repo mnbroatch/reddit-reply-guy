@@ -5,7 +5,7 @@ module.exports = class Post {
   constructor(post) {
   const {
     id,
-    comments,
+    comments = [],
     duplicatePostIds = [],
     post_hint,
     domain,

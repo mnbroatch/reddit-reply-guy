@@ -1,16 +1,10 @@
 const axios = require('axios')
-const Snoowrap = require('snoowrap')
-const NodeCache = require('node-cache')
 const uniqBy = require('lodash/uniqBy')
+const Snoowrap = require('snoowrap')
+const cache = require('./cache')
 const Post = require('./post')
 const stripComment = require('./strip-comment')
-const {
-  asyncMap,
-  asyncMapSerial,
-  asyncFilter,
-  asyncReduce,
-  asyncFind,
-} = require('./async-array-helpers')
+const { asyncMap } = require('./async-array-helpers')
 
 // var http = require('http-debug').http
 // var https = require('http-debug').https
@@ -43,46 +37,16 @@ snoowrap.config({
 
 class Api {
   constructor() {
-    this.cache = new NodeCache({
-      stdTTL: 60 * 60,
-      useClones: false
-    })
-    this.getSubredditPosts = this.getSubredditPosts.bind(this)
-
-    //  cache promise to handle parallel requests.
-    //  replace promise with actual value for serialization
     ;[
       'getPost',
       'getAuthorComments',
       'getDuplicatePostIds',
     ].forEach((functionName) => {
-      const func = this[functionName].bind(this)
-      this[functionName] = (async function () {
-        const cacheKey = require('crypto')
-          .createHash('md5')
-          .update( `${functionName}:${JSON.stringify(arguments)}`, 'utf8')
-          .digest('hex')
-
-        const maybeResult = await this.cache.get(cacheKey)
-
-        if (maybeResult) {
-          return maybeResult
-        } else {
-          const resultPromise = func(...arguments)
-          this.cache.set(
-            cacheKey,
-            resultPromise
-          )
-
-          this.cache.set(
-            cacheKey,
-            await resultPromise
-          )
-
-          return resultPromise
-        }
-      }).bind(this)
+      this[functionName] = cache.register(this[functionName], this)
     })
+
+    // caching this would be too redundant for little benefit
+    this.getSubredditPosts = this.getSubredditPosts.bind(this)
   }
 
   async getPost (postId) {
