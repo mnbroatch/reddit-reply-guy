@@ -17,8 +17,8 @@ module.exports = function stripComment({
     created,
     author,
     permalink,
-    link_id,
-    parent_id,
+    link_id: link_id.replace(/^t3_/, ''),
+    parent_id: parent_id.replace(/^t3_/, ''),
     subreddit,
     replyAuthors: [ ...replies.map(({ author }) => ({ author: author.name })) ],
   }

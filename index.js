@@ -29,6 +29,23 @@ try {
 } catch (e) {}
 
 const subreddits = [
+  'food',
+  'todayilearned',
+  'madlads',
+  'tifu',
+  'HistoryMemes',
+  'Futurology',
+  'nextfuckinglevel',
+  'gardening',
+  'forbiddensnacks',
+  'Overwatch',
+  'interestingasfuck',
+  'relationships',
+  'politics',
+  'leagueoflegends',
+  'Tinder',
+  'news',
+  'me_irl',
   'WhitePeopleTwitter',
   'happycowgifs',
   'cats',
@@ -62,26 +79,11 @@ const subreddits = [
   'funny',
   'memes',
   'gaming',
-  'food',
-  'todayilearned',
-  'madlads',
-  'tifu',
-  'HistoryMemes',
-  'Futurology',
-  'nextfuckinglevel',
-  'gardening',
-  'forbiddensnacks',
-  'Overwatch',
-  'interestingasfuck',
-  'relationships',
-  'politics',
-  'leagueoflegends',
-  'Tinder',
-  'news',
-  'me_irl',
 ]
 
 const subredditsThatDisallowBots = [
+  'americandad',
+  'Watches',
   'funny',
   'Futurology',
   'Gaming',
@@ -125,6 +127,7 @@ async function run ({
   postIds = postId ? [ postId ] : [],
   initialPlagiarismCases = []
 }) {
+  console.log('time: ', (new Date()).toLocaleTimeString())
   const data = new Data()
 
   authors.length && console.log(`searching authors: ${authors}`)
@@ -139,14 +142,16 @@ async function run ({
     .flat()
     .forEach(data.setPost)
 
+  // ignore inactive authors
   const commentsPerAuthor = (await asyncMap(uniqBy(authors), api.getAuthorComments))
-    .filter((authorComments) => {// ignore inactive authors
-      try {
-        return authorComments.sort((a, b) => b.created - a.created)[0]?.created * 1000 > Date.now() - MAX_COMMENT_AGE
-      } catch (e) {
-        console.log('authorComments', authorComments)
-        console.log('e', e)
+    .filter(authorComments => authorComments.length)
+    .filter((authorComments) => {
+      authorComments.sort((a, b) => b.created - a.created)
+      const isActive = authorComments[0].created * 1000 > Date.now() - MAX_COMMENT_AGE
+      if (!isActive) {
+        console.log(`ignoring inactive author: ${authorComments[0].author.name}`)
       }
+      return isActive
     })
 
   await asyncMap(
@@ -168,14 +173,11 @@ async function run ({
     }
   )
 
-  console.log('num posts before dupe search: ', data.getAllPosts().length)
-  console.log('time: ', (new Date()).toLocaleTimeString())
   await asyncMap(
     data.getAllPosts(),
     async (post) => {
       const duplicatePostIds = await api.getDuplicatePostIds(post)
-      console.log(`retrieving ${duplicatePostIds.length} duplicate posts for post: ${post.id}`)
-      console.log('duplicatePostIds', duplicatePostIds)
+      console.log(`retrieving ${duplicatePostIds.length - 1} duplicate posts for post: ${post.id}`)
       data.setPost({
         ...post,
         duplicatePostIds,
@@ -206,7 +208,13 @@ async function run ({
     })))
     
   if (printTable) {
-    printTables(plagiarismCasesPerAuthor)
+    plagiarismCasesPerAuthor.forEach((authorPlagiarismCases) => {
+      if (authorPlagiarismCases.length) {
+        console.log('----------------------------------')
+        console.log(authorPlagiarismCases[0].author)
+        console.log(createTable(authorPlagiarismCases))
+      }
+    })
   }
 
   await asyncMap(
@@ -235,15 +243,22 @@ async function run ({
   )
 
   // These plagiarism cases haven't had their author searched yet
-  const remainderPlagiarismCases = plagiarismCases // could improve around duplicate authors' cases
-    .filter(plagiarismCase => !authors.includes(plagiarismCase.author))
-    .sort((a, b) => b.copy.created - a.copy.created)
-    .slice(0, 20)
-  const remainderAuthors = remainderPlagiarismCases.map(plagiarismCase => plagiarismCase.author)
+  const remainderPlagiarismCases = plagiarismCases.filter(plagiarismCase => !authors.includes(plagiarismCase.author))
+
+  // We will 
+  const authorsToReturn = uniqBy(
+    remainderPlagiarismCases
+      .sort((a, b) => remainderPlagiarismCasesByAuthor[b.author].length - remainderPlagiarismCasesByAuthor[a.author].length
+        || b.copy.created - a.copy.created
+      )
+      .map(plagiarismCase => plagiarismCase.author)
+  ).slice(0, 20)
+
+  const plagiarismCasesToReturn = authorsToReturn.map(author => remainderPlagiarismCasesByAuthor[author]).flat()
 
   return {
-    plagiarismCases: remainderPlagiarismCases,
-    authors: remainderAuthors,
+    plagiarismCases: plagiarismCasesToReturn,
+    authors: authorsToReturn,
   }
 }
 
@@ -254,13 +269,6 @@ function shouldReply (plagiarismCase) {
 }
 
 async function printTables (plagiarismCasesPerAuthor) {
-  plagiarismCasesPerAuthor.forEach((authorPlagiarismCases) => {
-    if (authorPlagiarismCases.length) {
-      console.log('----------------------------------')
-      console.log(authorPlagiarismCases[0].author)
-      console.log(createTable(authorPlagiarismCases))
-    }
-  })
 }
 
 let dryRun
@@ -304,7 +312,7 @@ printTable = true
   }
 
   // await run({
-  //   subreddit: 'relationships',
+  //   author: 'porkinfielder',
   //   dryRun,
   //   printTable
   // })

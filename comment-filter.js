@@ -1,5 +1,7 @@
 const stripQuotes = require('./strip-quotes')
 
+const MIN_COMMENT_LENGTH = +process.env.MIN_COMMENT_LENGTH 
+
 const authorWhitelist = [
   'worldmobilemod',
   'WMTmod',
@@ -38,6 +40,7 @@ const criteria = [
   {
     description: 'Is body not primarily a reddit shorthand link?',
     test: (maybeCopy) => {
+      // TODO: fix this; why first word?
       const firstWord = maybeCopy.body.split(' ')[0]
       return maybeCopy.body.length > firstWord.length * 2
         || !/^\/?[ur]\//.test(firstWord)
@@ -52,7 +55,7 @@ const criteria = [
   {
     description: 'Is body long enough?',
     test: (maybeCopy) =>
-      stripQuotes(maybeCopy.body).length > 15,
+      stripQuotes(maybeCopy.body).length > MIN_COMMENT_LENGTH,
   },
 ]
 
