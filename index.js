@@ -30,7 +30,6 @@ try {
 } catch (e) {}
 
 const subreddits = [
-  'todayilearned',
   'madlads',
   'tifu',
   'HistoryMemes',
@@ -80,6 +79,7 @@ const subreddits = [
   'memes',
   'gaming',
   'food',
+  'todayilearned',
 ]
 
 const subredditsThatDisallowBots = [
@@ -299,44 +299,44 @@ printTable = true
 
 ;(async function () {
 
-  try {
-    let plagiarismCases = []
-    let authors = []
-    while (true) {
-      try {
-        await asyncMapSerial(
-          subreddits,
-          async (subreddit) => {
-            try {
-              const remainder = await run({
-                subreddit,
-                plagiarismCases,
-                authors,
-                dryRun,
-                printTable
-              })
-              plagiarismCases = remainder.plagiarismCases
-              authors = remainder.authors
-            } catch (e) {
-              console.error(`something went wrong:`)
-              console.error(e)
-            }
-          }
-        )
-      } catch (e) {
-        console.error(`something went wrong:`)
-        console.error(e)
-      }
-    }
-  } catch (e) {
-    console.log('e', e)
-  }
+  // try {
+  //   let plagiarismCases = []
+  //   let authors = []
+  //   while (true) {
+  //     try {
+  //       await asyncMapSerial(
+  //         subreddits,
+  //         async (subreddit) => {
+  //           try {
+  //             const remainder = await run({
+  //               subreddit,
+  //               plagiarismCases,
+  //               authors,
+  //               dryRun,
+  //               printTable
+  //             })
+  //             plagiarismCases = remainder.plagiarismCases
+  //             authors = remainder.authors
+  //           } catch (e) {
+  //             console.error(`something went wrong:`)
+  //             console.error(e)
+  //           }
+  //         }
+  //       )
+  //     } catch (e) {
+  //       console.error(`something went wrong:`)
+  //       console.error(e)
+  //     }
+  //   }
+  // } catch (e) {
+  //   console.log('e', e)
+  // }
 
-  // await run({
-  //   author: 'Tasty-Replacement',
-  //   dryRun,
-  //   printTable
-  // })
+  await run({
+    subreddit: 'aww',
+    dryRun,
+    printTable
+  })
 
 })()
 
