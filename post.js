@@ -2,14 +2,20 @@ const uniqBy = require('lodash/uniqBy')
 const stripComment = require('./strip-comment')
 
 module.exports = class Post {
-  constructor({
+  constructor(post) {
+  const {
     id,
     comments,
     duplicatePostIds = [],
     post_hint,
     domain,
     removed_by_category,
-  }) {
+  } = post
+
+    if (!comments) {
+      console.log('broken post', post)
+    }
+
     this.id = id
     this.comments = flattenComments(comments).map(stripComment)
     this.duplicatePostIds = duplicatePostIds

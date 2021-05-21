@@ -58,13 +58,8 @@ class Api {
     ].forEach((functionName) => {
       const func = this[functionName].bind(this)
       this[functionName] = (async function () {
-        const cacheKey = require('crypto')
-          .createHash('md5')
-          .update( `${functionName}:${JSON.stringify(arguments)}`, 'utf8')
-          .digest('hex')
-
+        const cacheKey = `${functionName}:${JSON.stringify(arguments)}`
         const maybeResult = await this.cache.get(cacheKey)
-
         if (maybeResult) {
           return maybeResult
         } else {
@@ -73,12 +68,10 @@ class Api {
             cacheKey,
             resultPromise
           )
-
           this.cache.set(
             cacheKey,
             await resultPromise
           )
-
           return resultPromise
         }
       }).bind(this)
@@ -147,6 +140,7 @@ class Api {
   async getDuplicatePostIds(post) {
     let duplicatePostIds = []
     if (canTryImageSearch(post)) {
+      console.log(`trying image search on post: ${post.id}`)
       try {
         duplicatePostIds = (await axios.get(
           `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`

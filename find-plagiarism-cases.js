@@ -17,7 +17,7 @@ module.exports = function findPlagiarismCases (posts) {
   console.log(`searching ${commentsPerPostWithDupes.length} posts`)
 
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
-    console.log(`searching post: ${comments[0]?.link_id} (${comments.length} comments)`)
+    console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments.filter(commentFilter))
     // If there are more matches than that, could be memery.
     // If bots start double posting, bump this filter up.
@@ -45,14 +45,10 @@ module.exports = function findPlagiarismCases (posts) {
   const repetitiveComments = Object.values(commentsByPlagiarist)
     .map((plagiaristComments) => Object.values(groupCommentsBySimilarBody(plagiaristComments, .7))
       .filter(similarComments => similarComments.length > 1)
-      .flat()
-    ).flat()
+    ).flat().flat()
 
   return maybePlagiarismCases
-    .filter(plagiarismCase => {
-      console.log('plagiarismCase.copy.id', plagiarismCase.copy.id)
-      !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id))
-    })
+    .filter(plagiarismCase => !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id)))
 }
 
 function groupCommentsBySimilarBody (comments, threshold = .85) {
