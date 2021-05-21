@@ -159,7 +159,7 @@ class Api {
   async replyToComment (comment, message) {
     console.log(`replying to comment: ${comment.id}`)
     try {
-      await ({
+      return ({
         ...comment,
         _r: snoowrap,
         _post: Snoowrap.objects.ReplyableContent.prototype._post,

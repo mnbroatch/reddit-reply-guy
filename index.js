@@ -30,15 +30,6 @@ try {
 } catch (e) {}
 
 const subreddits = [
-  'madlads',
-  'tifu',
-  'HistoryMemes',
-  'Futurology',
-  'nextfuckinglevel',
-  'gardening',
-  'forbiddensnacks',
-  'Overwatch',
-  'interestingasfuck',
   'relationships',
   'politics',
   'leagueoflegends',
@@ -80,6 +71,15 @@ const subreddits = [
   'gaming',
   'food',
   'todayilearned',
+  'madlads',
+  'tifu',
+  'HistoryMemes',
+  'Futurology',
+  'nextfuckinglevel',
+  'gardening',
+  'forbiddensnacks',
+  'Overwatch',
+  'interestingasfuck',
 ]
 
 const subredditsThatDisallowBots = [
@@ -222,42 +222,47 @@ async function run ({
   await asyncMap(
     plagiarismCasesPerAuthor
       .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES),
-    async authorPlagiarismCases => asyncMap(
-      await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
-      async (plagiarismCase) => {
-        if (dryRun) return
+    async authorPlagiarismCases => {
+      if (dryRun) return
 
-        await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
+      let reply // will be overwritten each case, we only need one per author
+      let comment
+      await asyncMap(
+        await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
+        async (plagiarismCase) => {
+          await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
 
-        if (shouldReply(plagiarismCase)) {
-          await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
-          await new Promise((resolve, reject) => {
-            setTimeout(async () => {
-              if (!await api.isCommentAlreadyRepliedTo(plagiarismCase.copy)) {
-                console.log(`reply not showing up: http://reddit.com${plagiarismCase.copy.permalink}`)
-              }
-              resolve()
-            }, 1000 * 30)
-          })
+          if (shouldReply(plagiarismCase)) {
+            reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
+            comment = plagiarismCase.copy
+          }
         }
+      )
+
+      if (
+        reply
+          && comment
+          && authorPlagiarismCases.length > 4
+          && !await cache.get(`author:${authorPlagiarismCases[0].author}:last-searched`)
+      ) {
+        console.log('reply', reply)
+        console.log('comment.author', comment.author)
+        console.log('comment.author.report', comment.author.report)
       }
-    )
+    }
   )
+
+  if (!dryRun) {
+    asyncMap(
+      authors,
+      author => cache.set(`author:${author}:last-searched`, Date.now(), 0)
+    )
+  }
 
   // Carry over some of the cases whose authors we haven't investigated fully.
   // Only carry over least recently searched authors and cases.
-  const { remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor } = groupBy(
-    plagiarismCasesPerAuthor,
-    authorPlagiarismCases => authors.includes(authorPlagiarismCases[0].author) ? 'searchedPlagiarismCasesPerAuthor' : 'remainderPlagiarismCasesPerAuthor'
-  )
-  console.log('remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor ', remainderPlagiarismCasesPerAuthor, searchedPlagiarismCasesPerAuthor )
-  await asyncMap(
-    searchedPlagiarismCasesPerAuthor,
-    async authorPlagiarismCases => {
-      console.log('authorPlagiarismCases[0].author', authorPlagiarismCases[0].author)
-      await cache.set(`author:${authorPlagiarismCases[0].author}:last-searched`, Date.now(), 0)
-    }
-  )
+  const remainderPlagiarismCasesPerAuthor = plagiarismCasesPerAuthor
+    .filter(authorPlagiarismCases => !authors.includes(authorPlagiarismCases[0].author))
 
   const remainderAuthorsLastSearched = await asyncMap(
     remainderPlagiarismCasesPerAuthor,
@@ -267,11 +272,9 @@ async function run ({
     })
   )
 
-  console.log('remainderAuthorsLastSearched', remainderAuthorsLastSearched)
-
   const authorsToReturn = uniqBy(
     remainderAuthorsLastSearched
-      .sort((a, b) => b.lastSearched - a.lastSearched)
+      .sort((a, b) => (a.lastSearched || 0) - (b.lastSearched || 0))
       .map(plagiarismCase => plagiarismCase.author)
   ).slice(0, 20)
 
@@ -299,44 +302,66 @@ printTable = true
 
 ;(async function () {
 
-  // try {
-  //   let plagiarismCases = []
-  //   let authors = []
-  //   while (true) {
-  //     try {
-  //       await asyncMapSerial(
-  //         subreddits,
-  //         async (subreddit) => {
-  //           try {
-  //             const remainder = await run({
-  //               subreddit,
-  //               plagiarismCases,
-  //               authors,
-  //               dryRun,
-  //               printTable
-  //             })
-  //             plagiarismCases = remainder.plagiarismCases
-  //             authors = remainder.authors
-  //           } catch (e) {
-  //             console.error(`something went wrong:`)
-  //             console.error(e)
-  //           }
-  //         }
-  //       )
-  //     } catch (e) {
-  //       console.error(`something went wrong:`)
-  //       console.error(e)
-  //     }
-  //   }
-  // } catch (e) {
-  //   console.log('e', e)
-  // }
+  try {
+    let plagiarismCases = []
+    let authors = [
+      'dsrfdcxdgdfgd',
+      'hoyadasilkeedi',
+      'rockbottam',
+      'westo4',
+      'HogDad1977',
+      'Rough_Idle',
+      'AstroFIJI',
+      'lostsoilder',
+      'kkfreak',
+      'HelenFrankenfield8',
+      'greydermis',
+      'Such-South-7072',
+      'Sam_and_Apollo1221',
+      'twodrifyboi',
+      'BankOfSchrute',
+      'Awesome123310',
+      'draxter',
+      'holly_667',
+      'danteXxX4',
+      'Solonna_conora'
+    ]
 
-  await run({
-    subreddit: 'aww',
-    dryRun,
-    printTable
-  })
+    while (true) {
+      try {
+        await asyncMapSerial(
+          subreddits,
+          async (subreddit) => {
+            try {
+              const remainder = await run({
+                subreddit,
+                plagiarismCases,
+                authors,
+                dryRun,
+                printTable
+              })
+              plagiarismCases = remainder.plagiarismCases
+              authors = remainder.authors
+            } catch (e) {
+              console.error(`something went wrong:`)
+              console.error(e)
+            }
+          }
+        )
+      } catch (e) {
+        console.error(`something went wrong:`)
+        console.error(e)
+      }
+    }
+  } catch (e) {
+    console.log('e', e)
+  }
+
+  // await run({
+  //   subreddit: 'aww',
+  //   dryRun,
+  //   printTable
+  // })
 
 })()
 
