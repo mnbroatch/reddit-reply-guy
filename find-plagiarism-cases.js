@@ -12,12 +12,7 @@ module.exports = function findPlagiarismCases (posts) {
       post => post.duplicatePostIds.sort()[0]
     )
   ) 
-    .map(posts => posts.map(post => {
-      if (!post.comments.length) {
-        console.log('post with no comments: ', post)
-      }
-      return post.comments
-    }).flat())
+    .map(posts => posts.map(post => post.comments).flat())
 
   console.log(`searching ${commentsPerPostWithDupes.length} posts`)
 

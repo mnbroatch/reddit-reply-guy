@@ -1,10 +1,15 @@
 const axios = require('axios')
+const JSONdb = require('simple-json-db');
 const uniqBy = require('lodash/uniqBy')
 const Snoowrap = require('snoowrap')
 const cache = require('./cache')
 const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
+
+const db = new JSONdb('db/authors.json', { asyncWrite: true });
+
+// Write db.data content to db.json
 
 // var http = require('http-debug').http
 // var https = require('http-debug').https
@@ -141,6 +146,22 @@ class Api {
   }
 
   // subject to breaking with snoowrap updates
+  async reportAuthor (author, message) {
+    console.log(`reporting author (I think): ${author}`)
+    try {
+      await snoowrap.oauthRequest({
+        uri: '/api/report_user',
+        method: 'post',
+        qs: {
+          reason: message,
+          user: author,
+        }
+      })
+    } catch (e) {
+      console.log('e', e)
+    }
+  }
+
   async reportComment (comment, message) {
     console.log(`reporting comment: ${comment.id}`)
     try {
@@ -150,7 +171,7 @@ class Api {
         _post: Snoowrap.objects.ReplyableContent.prototype._post,
         report: Snoowrap.objects.ReplyableContent.prototype.report,
       })
-        .report(message)
+        .report({ reason: message })
     } catch (e) {
       console.log('e', e)
     }
@@ -169,6 +190,16 @@ class Api {
     } catch (e) {
       console.log('e', e)
     }
+  }
+
+  setAuthorLastSearched (author) {
+    return db.set(author, {
+      lastSearched: Date.now()
+    })
+  }
+
+  async getAuthorLastSearched (author) {
+    return (await db.get(author))?.lastSearched
   }
 }
 

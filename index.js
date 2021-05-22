@@ -30,6 +30,23 @@ try {
 } catch (e) {}
 
 const subreddits = [
+  'mildlyinteresting',
+  'pics',
+  'gifs',
+  'NatureIsFuckingLit',
+  'funny',
+  'gaming',
+  'food',
+  'todayilearned',
+  'madlads',
+  'tifu',
+  'HistoryMemes',
+  'Futurology',
+  'nextfuckinglevel',
+  'gardening',
+  'forbiddensnacks',
+  'Overwatch',
+  'interestingasfuck',
   'relationships',
   'politics',
   'leagueoflegends',
@@ -60,37 +77,15 @@ const subreddits = [
   'popular',
   'AskReddit',
   'pcmasterrace',
+  'memes',
   'videos',
   'gadgets',
-  'mildlyinteresting',
-  'pics',
-  'gifs',
-  'NatureIsFuckingLit',
-  'funny',
-  'memes',
-  'gaming',
-  'food',
-  'todayilearned',
-  'madlads',
-  'tifu',
-  'HistoryMemes',
-  'Futurology',
-  'nextfuckinglevel',
-  'gardening',
-  'forbiddensnacks',
-  'Overwatch',
-  'interestingasfuck',
 ]
 
 const subredditsThatDisallowBots = [
   'americandad',
-  'Watches',
-  'funny',
   'Futurology',
-  'Gaming',
-  'Games',
   'WTF',
-  'memes',
   'Jokes',
   'gifs',
   'books',
@@ -225,7 +220,7 @@ async function run ({
     async authorPlagiarismCases => {
       if (dryRun) return
 
-      let reply // will be overwritten each case, we only need one per author
+      let reply // will be overwritten each case, but we only need one per author
       let comment
       await asyncMap(
         await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
@@ -243,11 +238,9 @@ async function run ({
         reply
           && comment
           && authorPlagiarismCases.length > 4
-          && !await cache.get(`author:${authorPlagiarismCases[0].author}:last-searched`)
+          && !await api.getAuthorLastSearched(comment.author.name)
       ) {
-        console.log('reply', reply)
-        console.log('comment.author', comment.author)
-        console.log('comment.author.report', comment.author.report)
+        await api.reportAuthor(comment.author.name, `http://reddit.com/comments/${comment.link_id}//${reply.id}`)
       }
     }
   )
@@ -255,7 +248,7 @@ async function run ({
   if (!dryRun) {
     asyncMap(
       authors,
-      author => cache.set(`author:${author}:last-searched`, Date.now(), 0)
+      api.setAuthorLastSearched
     )
   }
 
@@ -268,13 +261,21 @@ async function run ({
     remainderPlagiarismCasesPerAuthor,
     async authorPlagiarismCases => ({
       author: authorPlagiarismCases[0].author,
-      lastSearched: await cache.get(`author:${authorPlagiarismCases[0].author}:last-searched`)
+      lastSearched: await api.getAuthorLastSearched(authorPlagiarismCases[0].author),
+      latestCommentCreated: authorPlagiarismCases.sort((a, b) => b.copy.created - a.copy.created)[0].copy.created,
+      plagiarismCasesCount: authorPlagiarismCases.length
     })
   )
 
+  console.log('remainderAuthorsLastSearched', remainderAuthorsLastSearched)
+
   const authorsToReturn = uniqBy(
     remainderAuthorsLastSearched
-      .sort((a, b) => (a.lastSearched || 0) - (b.lastSearched || 0))
+      .sort((a, b) => 
+        (a.lastSearched || 0) - (b.lastSearched || 0)
+          || b.plagiarismCasesCount - a.plagiarismCasesCount
+          || b.latestCommentCreated - b.latestCommentCreated
+      )
       .map(plagiarismCase => plagiarismCase.author)
   ).slice(0, 20)
 
@@ -302,31 +303,10 @@ printTable = true
 
 ;(async function () {
 
-  try {
-    let plagiarismCases = []
-    let authors = [
-      'dsrfdcxdgdfgd',
-      'hoyadasilkeedi',
-      'rockbottam',
-      'westo4',
-      'HogDad1977',
-      'Rough_Idle',
-      'AstroFIJI',
-      'lostsoilder',
-      'kkfreak',
-      'HelenFrankenfield8',
-      'greydermis',
-      'Such-South-7072',
-      'Sam_and_Apollo1221',
-      'twodrifyboi',
-      'BankOfSchrute',
-      'Awesome123310',
-      'draxter',
-      'holly_667',
-      'danteXxX4',
-      'Solonna_conora'
-    ]
+  let plagiarismCases = []
+  let authors = []
 
+  try {
     while (true) {
       try {
         await asyncMapSerial(
@@ -358,7 +338,7 @@ printTable = true
   }
 
   // await run({
-  //   subreddit: 'aww',
+  //   author: 'Sploosh89',
   //   dryRun,
   //   printTable
   // })

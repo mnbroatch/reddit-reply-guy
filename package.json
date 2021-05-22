@@ -12,6 +12,7 @@
     "axios": "^0.21.1",
     "dotenv": "^8.2.0",
     "node-cache": "^5.1.2",
+    "simple-json-db": "^1.2.3",
     "snoowrap": "^1.22.0",
     "string-similarity": "^4.0.4"
   },
