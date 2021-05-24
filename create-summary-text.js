@@ -55,7 +55,7 @@ function createTable (plagiarismCases) {
 }
 
 function truncate(body) {
-  const escapedBody = body.replace(/\W/g, "\\$&").replace(/\n/g, ' ')
+  const escapedBody = body.replace(/[\]\n\|\\]/g, ' ')
   return escapedBody.length > 30
     ? escapedBody.slice(0, 30) + '...'
     : escapedBody

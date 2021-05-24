@@ -18,6 +18,8 @@ const subredditWhitelist = [
   'Superstonk',
   '196',
   'RandomActsOfGaming',
+  'steam_giveaway',
+  'giveaways',
 ]
 
 const criteria = [

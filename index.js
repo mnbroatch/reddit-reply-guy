@@ -30,7 +30,6 @@ try {
 } catch (e) {}
 
 const subreddits = [
-  'mildlyinteresting',
   'pics',
   'gifs',
   'NatureIsFuckingLit',
@@ -80,9 +79,14 @@ const subreddits = [
   'memes',
   'videos',
   'gadgets',
+  'mildlyinteresting',
 ]
 
 const subredditsThatDisallowBots = [
+  'Overwatch',
+  'castlevania',
+  'teenagers',
+  'RealLifeShinies',
   'americandad',
   'Futurology',
   'WTF',
@@ -246,7 +250,7 @@ async function run ({
   )
 
   if (!dryRun) {
-    asyncMap(
+    await asyncMap(
       authors,
       api.setAuthorLastSearched
     )
@@ -293,9 +297,6 @@ function shouldReply (plagiarismCase) {
   )
 }
 
-async function printTables (plagiarismCasesPerAuthor) {
-}
-
 let dryRun
 let printTable
 printTable = true
@@ -304,7 +305,8 @@ printTable = true
 ;(async function () {
 
   let plagiarismCases = []
-  let authors = []
+  let authors = [
+  ]
 
   try {
     while (true) {
@@ -338,8 +340,8 @@ printTable = true
   }
 
   // await run({
-  //   author: 'Sploosh89',
-  //   dryRun,
+  //   author: 'Ok_Customer2455',
+  //   // dryRun: true,
   //   printTable
   // })
 
