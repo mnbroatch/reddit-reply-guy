@@ -14,7 +14,13 @@ module.exports = function findPlagiarismCases (posts) {
   ) 
     .map(posts => posts.map(post => post.comments).flat())
 
+  commentsPerPostWithDupes.forEach(comments => {
+    console.log(`-----------`)
+    console.log(Object.keys(groupBy(comments, 'link_id')))
+  })
+
   console.log(`searching ${commentsPerPostWithDupes.length} posts`)
+  console.log('posts.length', posts.length)
 
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)

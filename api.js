@@ -7,7 +7,7 @@ const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
 
-const db = new JSONdb('db/authors.json', { asyncWrite: true });
+const db = new JSONdb('db/authors.json')
 
 // Write db.data content to db.json
 
@@ -145,7 +145,6 @@ class Api {
     return uniqBy([ ...duplicatePostIds, post.id ])
   }
 
-  // subject to breaking with snoowrap updates
   async reportAuthor (author, message) {
     console.log(`reporting author (I think): ${author}`)
     try {
@@ -156,6 +155,12 @@ class Api {
           reason: message,
           user: author,
         }
+      })
+
+      const authorData = db.get(author) || {}
+      await db.set(author, {
+        ...authorData,
+        reported: Date.now()
       })
     } catch (e) {
       console.log('e', e)
@@ -193,13 +198,19 @@ class Api {
   }
 
   setAuthorLastSearched (author) {
+    const authorData = db.get(author) || {}
     return db.set(author, {
+      ...authorData,
       lastSearched: Date.now()
     })
   }
 
   async getAuthorLastSearched (author) {
     return (await db.get(author))?.lastSearched
+  }
+
+  async hasAuthorBeenReported (author) {
+    return !!(await db.get(author))?.reported
   }
 }
 

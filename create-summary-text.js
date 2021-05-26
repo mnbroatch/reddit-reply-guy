@@ -1,3 +1,5 @@
+const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
+
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
   'chodi',
@@ -12,7 +14,7 @@ function createReportText(plagiarismCase) {
 }
 
 function createReplyText (plagiarismCase) {
-  const subreddit = plagiarismCase.original.subreddit.display_name
+  const subreddit = plagiarismCase.copy.subreddit.display_name
   const noLinks = subredditsThatDisallowLinks
     .find(sub => sub.toLowerCase() === subreddit.toLowerCase())
   const noUsernameLinks = noLinks || subredditsThatDisallowUsernameLinks
