@@ -1,7 +1,6 @@
 require('dotenv').config()
 const fs = require('fs')
 const api = require('./api')
-const cache = require('./cache')
 const Data = require('./data')
 const uniqBy = require('lodash/uniqBy')
 const groupBy = require('lodash/groupBy')
@@ -22,11 +21,13 @@ const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_RE
 const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
 const MAX_REMAINDER_AUTHORS = +process.env.MAX_REMAINDER_AUTHORS
 
-try {
-  cache._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
-} catch (e) {}
-
 const subredditsThatDisallowBots = [
+  'AnimalCrossing',
+  'MAAU',
+  'upvote',
+  'pcmasterrace',
+  'chodi',
+  'formuladank',
   'BlackClover',
   'Overwatch',
   'castlevania',
@@ -141,7 +142,6 @@ async function run ({
     }
   )
 
-  console.log('num posts after dupe search: ', data.getAllPosts().length)
   const plagiarismCases = uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id')
   console.log('plagiarismCases.length', plagiarismCases.length)
 

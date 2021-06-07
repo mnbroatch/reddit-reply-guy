@@ -7,7 +7,8 @@ const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
 
-const db = new JSONdb('db/authors.json')
+const authorsDb = new JSONdb('db/authors.json')
+const commentsDb = new JSONdb('db/comments.json')
 
 // var http = require('http-debug').http
 // var https = require('http-debug').https
@@ -155,8 +156,8 @@ class Api {
         }
       })
 
-      const authorData = db.get(author) || {}
-      await db.set(author, {
+      const authorData = authorsDb.get(author) || {}
+      await authorsDb.set(author, {
         ...authorData,
         reported: Date.now()
       })
@@ -175,6 +176,12 @@ class Api {
         report: Snoowrap.objects.ReplyableContent.prototype.report,
       })
         .report({ reason: message })
+
+      const commentData = commentsDb.get(comment) || {}
+      await commentsDb.set(comment.id, {
+        ...commentData,
+        reported: Date.now()
+      })
     } catch (e) {
       console.log('e', e)
     }
@@ -196,8 +203,8 @@ class Api {
   }
 
   setAuthorLastSearched (author, plagiarismCaseCount) {
-    const authorData = db.get(author) || {}
-    return db.set(author, {
+    const authorData = authorsDb.get(author) || {}
+    return authorsDb.set(author, {
       ...authorData,
       lastSearched: Date.now(),
       plagiarismCaseCount,
@@ -205,11 +212,15 @@ class Api {
   }
 
   async getAuthorLastSearched (author) {
-    return (await db.get(author))?.lastSearched
+    return (await authorsDb.get(author))?.lastSearched
+  }
+
+  async hasCommentBeenReported (comment) {
+    return !!(await commentsDb.get(comment.id))?.reported
   }
 
   async hasAuthorBeenReported (author) {
-    return !!(await db.get(author))?.reported
+    return !!(await authorsDb.get(author))?.reported
   }
 }
 

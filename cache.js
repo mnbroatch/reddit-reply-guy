@@ -1,5 +1,7 @@
+const fs = require('fs')
 const crypto = require('crypto')
 const NodeCache = require('node-cache')
+const pickBy = require('lodash/pickBy')
 
 class Cache {
   constructor() {
@@ -10,6 +12,12 @@ class Cache {
 
     this.set = this._cache.set.bind(this._cache)
     this.get = this._cache.get.bind(this._cache)
+
+    try {
+      this._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   //  cache promises to handle parallel requests.
@@ -40,6 +48,14 @@ class Cache {
         return resultPromise
       }
     }).bind(this)
+  }
+
+  backupToFile () {
+    const cacheToSave = pickBy(
+      cache._cache.data,
+      value => Object.prototype.toString.call(value.v) !== '[object Promise]'
+    )
+    fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))
   }
 }
 

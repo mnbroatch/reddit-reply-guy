@@ -1,13 +1,8 @@
 const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
 
-const subredditsThatDisallowLinks = [
-  'pcmasterrace',
-  'chodi',
-  'formuladank',
-]
-
 const subredditsThatDisallowUsernameLinks = [
   'politics',
+  'LoveForLandlords',
 ]
 
 function createReportText(plagiarismCase) {
@@ -16,38 +11,24 @@ function createReportText(plagiarismCase) {
 
 function createReplyText (plagiarismCase) {
   const subreddit = plagiarismCase.copy.subreddit.display_name
-  const noLinks = subredditsThatDisallowLinks
+  const noUsernameLinks = subredditsThatDisallowUsernameLinks
     .find(sub => sub.toLowerCase() === subreddit.toLowerCase())
-  const noUsernameLinks = noLinks || subredditsThatDisallowUsernameLinks
-    .find(sub => sub.toLowerCase() === subreddit.toLowerCase())
-
-  const original = noLinks
-    ? 'another'
-    : `[this one](http://np.reddit.com${plagiarismCase.original.permalink})`
 
   const originalLocation = plagiarismCase.copy.link_id === plagiarismCase.original.link_id
     ? 'elsewhere in this comment section.'
     : "in a similar post's comment section."
 
-  const excuse = noLinks
-    ? ' The rules of this subreddit do not allow me to link to it.'
-    : '' 
-
-  const additional = noLinks
-    ? '.'
-    : `:
-
-${createTable(plagiarismCase.additional)}`
-
-  const username = noUsernameLinks
+  const user = noUsernameLinks
     ? 'the user above'
     : ` [/u/${plagiarismCase.author}](https://np.reddit.com/u/${plagiarismCase.author}/)`
 
-  return `The above comment was stolen from ${original} ${originalLocation}${excuse}
+  return `The above comment was stolen from [this one](http://np.reddit.com${plagiarismCase.original.permalink}) ${originalLocation}
 
-It is probably not a coincidence, because this user has done it before${additional}
+It is probably not a coincidence, because there are more instances by this user:
 
-beep boop, I'm a bot -|:] It is this bot's opinion that ${username} should be banned for spamming. A human checks in on this bot sometimes, so please reply if I made a mistake. Contact reply-guy-bot if you have concerns.`
+${createTable(plagiarismCase.additional)}
+
+beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned for karma manipulation. Don't feel bad, they are probably a bot too.`
 }
 
 function createTable (plagiarismCases) {

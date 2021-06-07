@@ -14,11 +14,7 @@ module.exports = function findPlagiarismCases (posts) {
     )
   ) 
     .map(posts => posts.map(post => post.comments).flat())
-
-  commentsPerPostWithDupes.forEach(comments => {
-    console.log(`-----------`)
-    console.log(Object.keys(groupBy(comments, 'link_id')))
-  })
+    .filter(postComments => postComments.length > 1)
 
   console.log(`searching ${commentsPerPostWithDupes.length} posts`)
   console.log('posts.length', posts.length)
