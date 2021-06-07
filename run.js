@@ -20,18 +20,18 @@ const {
 const MIN_PLAGIARIST_CASES_FOR_COMMENT = +process.env.MIN_PLAGIARIST_CASES_FOR_COMMENT
 const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
 const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
+const MAX_REMAINDER_AUTHORS = +process.env.MAX_REMAINDER_AUTHORS
 
 try {
   cache._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
 } catch (e) {}
 
 const subredditsThatDisallowBots = [
+  'BlackClover',
   'Overwatch',
   'castlevania',
   'teenagers',
-  'RealLifeShinies',
   'americandad',
-  'Futurology',
   'WTF',
   'Jokes',
   'gifs',
@@ -40,7 +40,6 @@ const subredditsThatDisallowBots = [
   'AskReddit',
   'holdmyredbull',
   'IAmA',
-  'todayilearned',
   'sports',
   'politics',
   'Minecraft',
@@ -52,7 +51,6 @@ const subredditsThatDisallowBots = [
   'Republican',
   'OldPhotosInRealLife',
   'cars',
-  'sweden',
   'Israel',
   'Arkansas',
   'MakeMeSuffer',
@@ -167,7 +165,7 @@ async function run ({
   await asyncMap(
     plagiarismCasesPerAuthor
       .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT),
-    async authorPlagiarismCases => {
+    async (authorPlagiarismCases) => {
       if (dryRun) return
 
       let reply // will be overwritten each case, but we only need one per author
@@ -197,7 +195,10 @@ async function run ({
   if (!dryRun) {
     await asyncMap(
       authors,
-      api.setAuthorLastSearched
+      author => api.setAuthorLastSearched(
+        author,
+        plagiarismCasesByAuthor[author]?.length
+      )
     )
   }
 
@@ -224,7 +225,7 @@ async function run ({
           || b.latestCommentCreated - b.latestCommentCreated
       )
       .map(plagiarismCase => plagiarismCase.author)
-  ).slice(0, 20)
+  ).slice(0, MAX_REMAINDER_AUTHORS)
 
   const plagiarismCasesToReturn = authorsToReturn.map(author => plagiarismCasesByAuthor[author]).flat()
 

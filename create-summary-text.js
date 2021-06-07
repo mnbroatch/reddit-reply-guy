@@ -3,6 +3,7 @@ const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_RE
 const subredditsThatDisallowLinks = [
   'pcmasterrace',
   'chodi',
+  'formuladank',
 ]
 
 const subredditsThatDisallowUsernameLinks = [
@@ -10,7 +11,7 @@ const subredditsThatDisallowUsernameLinks = [
 ]
 
 function createReportText(plagiarismCase) {
-  return `Copies ${plagiarismCase.original.permalink}`
+  return `Copies reddit.com/comments/${plagiarismCase.original.link_id}/foo/${plagiarismCase.original.id}`
 }
 
 function createReplyText (plagiarismCase) {

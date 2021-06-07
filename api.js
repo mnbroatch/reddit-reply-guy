@@ -9,8 +9,6 @@ const { asyncMap } = require('./async-array-helpers')
 
 const db = new JSONdb('db/authors.json')
 
-// Write db.data content to db.json
-
 // var http = require('http-debug').http
 // var https = require('http-debug').https
 // http.debug = 1
@@ -197,11 +195,12 @@ class Api {
     }
   }
 
-  setAuthorLastSearched (author) {
+  setAuthorLastSearched (author, plagiarismCaseCount) {
     const authorData = db.get(author) || {}
     return db.set(author, {
       ...authorData,
-      lastSearched: Date.now()
+      lastSearched: Date.now(),
+      plagiarismCaseCount,
     })
   }
 
