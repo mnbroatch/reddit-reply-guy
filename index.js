@@ -15,7 +15,6 @@ const subreddits = [
   'gifs',
   'Minecraft',
   'memes',
-  'Art',
   'JusticeServed',
   'movies',
   'XboxSeriesX',
