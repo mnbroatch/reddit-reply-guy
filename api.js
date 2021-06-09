@@ -168,7 +168,6 @@ class Api {
   }
 
   async reportComment (comment, message) {
-    console.log(`reporting comment: ${comment.id}`)
     try {
       await ({
         ...comment,
@@ -183,9 +182,20 @@ class Api {
         ...commentData,
         reported: Date.now()
       })
+
+      const authorData = authorsDb.get(comment.author.name) || {}
+      const reportedInSubs = authorData.reportedInSubs || []
+      await authorsDb.set(comment.author.name, {
+        ...authorData,
+        reportedInSubs: uniqBy([ ...reportedInSubs, comment.subreddit.display_name ]),
+      })
     } catch (e) {
       console.log('e', e)
     }
+  }
+
+  getAuthorReportedSubs (author) {
+    return authorsDb.get(author)?.reportedInSubs || []
   }
 
   async replyToComment (comment, message) {

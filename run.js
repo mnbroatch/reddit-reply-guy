@@ -13,6 +13,7 @@ const {
 } = require('./create-summary-text')
 const {
   asyncMap,
+  asyncMapSerial,
   asyncFilter,
 } = require('./async-array-helpers')
 
@@ -20,6 +21,10 @@ const MIN_PLAGIARIST_CASES_FOR_COMMENT = +process.env.MIN_PLAGIARIST_CASES_FOR_C
 const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
 const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
 const MAX_REMAINDER_AUTHORS = +process.env.MAX_REMAINDER_AUTHORS
+
+const subsThatDemandOneReportPerAuthor = [
+  'funny',
+]
 
 const subredditsThatDisallowBots = [
   'AnimalCrossing',
@@ -172,9 +177,14 @@ async function run ({
 
       let reply // will be overwritten each case, but we only need one per author
       let comment
-      await asyncMap(
+      await asyncMapSerial(
         await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
         async (plagiarismCase) => {
+          if (
+            subsThatDemandOneReportPerAuthor.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())
+            && api.getAuthorReportedSubs(plagiarismCase.author).includes(plagiarismCase.copy.subreddit.display_name)
+          ) return // this is why we use asyncMapSerial here
+
           await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
 
           if (shouldReply(plagiarismCase)) {
