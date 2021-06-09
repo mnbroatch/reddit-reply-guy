@@ -62,6 +62,7 @@ class Api {
         post_hint: await post.post_hint,
         domain: await post.domain,
         removed_by_category: await post.removed_by_category,
+        title: await post.title,
       }
       console.log(`retrieved post: ${postId}`)
       return new Post(unwrappedPost)

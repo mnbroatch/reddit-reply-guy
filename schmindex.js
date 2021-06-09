@@ -6,8 +6,10 @@ const api = require('./api')
 ;(async function () {
 
   const { authors } = await run({
-    subreddit: 'Instagram',
-    authors: [],
+    // subreddit: 'Instagram',
+    authors: [
+      'connor_bedard',
+    ],
     dryRun: true,
     printTable: true
   })

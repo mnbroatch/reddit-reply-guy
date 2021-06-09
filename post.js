@@ -10,6 +10,7 @@ module.exports = class Post {
     post_hint,
     domain,
     removed_by_category,
+    title,
   } = post
 
     if (!comments) {
@@ -22,6 +23,7 @@ module.exports = class Post {
     this.post_hint = post_hint
     this.domain = domain
     this.removed_by_category = removed_by_category
+    this.title = title
   }
 }
 

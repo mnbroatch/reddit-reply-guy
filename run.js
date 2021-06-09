@@ -58,6 +58,10 @@ const subredditsThatDisallowBots = [
   'barkour',
 ]
 
+const whitelistedTitles = [
+  'Game Winning Goal Challenge',
+]
+
 async function run ({
   dryRun,
   printTable,
@@ -78,10 +82,12 @@ async function run ({
 
   ;(await asyncMap(postIds, api.getPost))
     .flat()
+    .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
     .forEach(data.setPost)
 
   ;(await asyncMap(subreddits, api.getSubredditPosts))
     .flat()
+    .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
     .forEach(data.setPost)
 
   // ignore inactive authors
@@ -103,7 +109,7 @@ async function run ({
     )),
     async ([postId, comments]) => {
       const post = data.getPost(postId) || await api.getPost(postId)
-      if (post) {
+      if (post && !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase()))) {
         data.setPost({
           ...post,
           comments: uniqBy(
@@ -126,16 +132,12 @@ async function run ({
       await asyncMap(
         duplicatePostIds,
         async (dupeId) => {
-          try {
           const dupe = data.getPost(dupeId) || await api.getPost(dupeId)
           if (dupe) {
             data.setPost({
               ...dupe,
               duplicatePostIds,
             })
-          }
-          } catch (e) {
-            console.log('e', e)
           }
         }
       )
