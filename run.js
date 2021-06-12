@@ -9,6 +9,7 @@ const plagiarismCaseFilter = require('./plagiarism-case-filter')
 const {
   createReplyText,
   createReportText,
+  createModmailText,
   createTable
 } = require('./create-summary-text')
 const {
@@ -26,7 +27,12 @@ const subsThatDemandOneReportPerAuthor = [
   'funny',
 ]
 
+const subsThatRequestModmail = [
+  'movies',
+]
+
 const subredditsThatDisallowBots = [
+  'BoneAppleTea',
   'AnimalCrossing',
   'MAAU',
   'upvote',
@@ -190,6 +196,14 @@ async function run ({
           if (shouldReply(plagiarismCase)) {
             reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
             comment = plagiarismCase.copy
+          }
+
+          if (subsThatRequestModmail.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())) {
+            await api.sendModmail(
+              plagiarismCase.copy.subreddit.display_name,
+              `reply-guy-bot found a match: ${plagiarismCase.copy.id}`,
+              createModmailText(plagiarismCase)
+            )
           }
         }
       )

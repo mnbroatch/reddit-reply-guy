@@ -20,6 +20,7 @@ const subredditWhitelist = [
   'RandomActsOfGaming',
   'steam_giveaway',
   'giveaways',
+  'copypasta',
 ]
 
 const criteria = [

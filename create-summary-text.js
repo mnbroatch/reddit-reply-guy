@@ -6,7 +6,17 @@ const subredditsThatDisallowUsernameLinks = [
 ]
 
 function createReportText(plagiarismCase) {
-  return `Copies reddit.com/comments/${plagiarismCase.original.link_id}/foo/${plagiarismCase.original.id}`
+  return `bot - copies reddit.com/comments/${plagiarismCase.original.link_id}/foo/${plagiarismCase.original.id}`
+}
+
+function createModmailText (plagiarismCase) {
+  return `Plagiarized comment found: ${plagiarismCase.copy.permalink}
+
+Original: ${plagiarismCase.original.permalink}
+
+Additional evidence against plagiarist:
+
+${createTable(plagiarismCase.additional)}`
 }
 
 function createReplyText (plagiarismCase) {
@@ -24,7 +34,7 @@ function createReplyText (plagiarismCase) {
 
   return `The above comment was stolen from [this one](http://np.reddit.com${plagiarismCase.original.permalink}) ${originalLocation}
 
-It is probably not a coincidence, because there are more instances by this user:
+It is probably not a coincidence; here is some more evidence against this user:
 
 ${createTable(plagiarismCase.additional)}
 
@@ -32,9 +42,9 @@ beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned
 }
 
 function createTable (plagiarismCases) {
-  return `Original | Plagiarized\n-------- | -----------`
+  return `Plagiarized | Original\n-------- | -----------`
     + plagiarismCases.reduce((acc, plagiarismCase) =>
-      acc + `\n[${truncate(plagiarismCase.original.body)}](http://np.reddit.com${plagiarismCase.original.permalink}) | [${truncate(plagiarismCase.copy.body)}](http://np.reddit.com${plagiarismCase.copy.permalink})`
+      acc + `\n[${truncate(plagiarismCase.copy.body)}](http://np.reddit.com${plagiarismCase.copy.permalink}) | [${truncate(plagiarismCase.original.body)}](http://np.reddit.com${plagiarismCase.original.permalink})`
       , '')
 }
 
@@ -48,5 +58,6 @@ function truncate(body) {
 module.exports = {
   createReplyText,
   createReportText,
+  createModmailText,
   createTable,
 }

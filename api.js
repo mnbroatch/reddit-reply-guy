@@ -53,6 +53,23 @@ class Api {
     this.getSubredditPosts = this.getSubredditPosts.bind(this)
   }
 
+  async getComment (id) {
+    const comment = snoowrap.getComment(id)
+
+    return {
+      id: await comment.id,
+      name: await comment.name,
+      body: await comment.body,
+      created: await comment.created,
+      author: await comment.author,
+      permalink: await comment.permalink,
+      link_id: (await comment.link_id).replace(/^t3_/, ''),
+      parent_id: (await comment.parent_id).replace(/^t3_/, ''),
+      subreddit: await comment.subreddit,
+      replyAuthors: [ ...(await comment.replies).map(({ author }) => ({ author: author.name })) ],
+    }
+  }
+
   async getPost (postId) {
     try {
       const post = await snoowrap.getSubmission(postId)
@@ -168,6 +185,7 @@ class Api {
   }
 
   async reportComment (comment, message) {
+    console.log(`reporting comment: ${comment.id}`)
     try {
       await ({
         ...comment,
@@ -194,10 +212,6 @@ class Api {
     }
   }
 
-  getAuthorReportedSubs (author) {
-    return authorsDb.get(author)?.reportedInSubs || []
-  }
-
   async replyToComment (comment, message) {
     console.log(`replying to comment: ${comment.id}`)
     try {
@@ -211,6 +225,23 @@ class Api {
     } catch (e) {
       console.log('e', e)
     }
+  }
+
+  async sendModmail (subreddit, subject, text) {
+    try {
+    console.log(`sending modmail to r/${subreddit}`)
+    await snoowrap.composeMessage({
+      to: `r/${subreddit}`,
+      subject,
+      text,
+    })
+    } catch(e) {
+      console.log('e', e)
+    }
+  }
+
+  getAuthorReportedSubs (author) {
+    return authorsDb.get(author)?.reportedInSubs || []
   }
 
   setAuthorLastSearched (author, plagiarismCaseCount) {
