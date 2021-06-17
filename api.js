@@ -131,36 +131,58 @@ class Api {
   }
 
   async getDuplicatePostIds(post) {
-    let duplicatePostIds = []
+    let duplicatePostIdsFromImageSearch = []
+    let duplicatePostIdsFromUrlSearch = []
+    let duplicatePostIdsFromReddit = []
+
+    try {
+      duplicatePostIdsFromReddit = await asyncMap(
+        await snoowrap.getSubmission(post.id).getDuplicates().comments,
+        dupeMeta => dupeMeta.id
+      )
+    } catch (e) {
+      console.log('e', e)
+    }
+
+    try {
+      duplicatePostIdsFromUrlSearch = await asyncMap(
+        await snoowrap.oauthRequest({
+          uri: '/api/info',
+          method: 'get',
+          qs: {
+            url: await post.url,
+          }
+        }),
+        dupeMeta => dupeMeta.id
+      )
+    } catch (e) {
+      console.log('e', e)
+    }
+
     if (canTryImageSearch(post)) {
       try {
-        duplicatePostIds = (await axios.get(
+        const matches = (await axios.get(
           `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`
-        ))
-          .data.matches.map(match => match.post.post_id)
-      } catch (e) { }
+          )).data.matches.map(match => match.post.post_id)
+
+        // If there are too many hits from the image search,
+        // we won't trust them. Perhaps a subtle meme format.
+        // An example would be chess gifs; lots of false positives.
+        duplicatePostIdsFromImageSearch = matches.length < 20
+          ? matches
+          : []
+      } catch (e) {
+      }
     }
 
-    // We should see if it's worth always checking both places
-    // If there are too many hits from the image search, use this.
-    // An example would be chess gifs; lots of false positives
-    if (!duplicatePostIds.length || duplicatePostIds.length > 20) {
-      try {
-        duplicatePostIds = await asyncMap(
-          await snoowrap.oauthRequest({
-            uri: '/api/info',
-            method: 'get',
-            qs: {
-              url: await post.url,
-            }
-          }),
-          dupeMeta => dupeMeta.id
-        )
-      } catch (e) { }
-    }
-
-    return uniqBy([ ...duplicatePostIds, post.id ])
+    return uniqBy([ 
+      ...duplicatePostIdsFromUrlSearch,
+      ...duplicatePostIdsFromReddit,
+      ...duplicatePostIdsFromImageSearch,
+      post.id
+    ])
   }
+
 
   async reportAuthor (author, message) {
     console.log(`reporting author (I think): ${author}`)

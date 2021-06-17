@@ -10,10 +10,13 @@ const authorWhitelist = [
   'Quoterm',
   'Lars_porsenna',
   'Jaysog',
+  'CryptoFutureBot',
   '[deleted]',
 ]
 
 const subredditWhitelist = [
+  'SpotaTroll',
+  'Genshin_Memepact',
   'FreeKarma4U',
   'Superstonk',
   '196',
@@ -58,7 +61,7 @@ const criteria = [
   {
     description: 'Is body long enough?',
     test: (maybeCopy) =>
-      stripQuotes(maybeCopy.body).length > MIN_COMMENT_LENGTH,
+      maybeCopy.body.length > MIN_COMMENT_LENGTH,
   },
 ]
 

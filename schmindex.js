@@ -10,16 +10,16 @@ const {
 
 ;(async function () {
 
-  // const { authors } = await run({
-  //   // subreddit: 'Instagram',
-  //   authors: [
-  //     "Mkjuloinbhg",
-  //     "jonadaytuyu65765",
-  //   ],
-  //   // dryRun: true,
-  //   printTable: true
-  // })
-  // console.log(JSON.stringify(authors, null, 2))
+  const { authors } = await run({
+    // postId: 'nyhjap',
+    // subreddit: 'Instagram',
+    authors: [
+      "RiddledCybersex75",
+    ],
+    // dryRun: true,
+    printTable: true
+  })
+  console.log(JSON.stringify(authors, null, 2))
 
 })()
 

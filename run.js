@@ -32,6 +32,7 @@ const subsThatRequestModmail = [
 ]
 
 const subredditsThatDisallowBots = [
+  'ElectricForest',
   'BoneAppleTea',
   'AnimalCrossing',
   'MAAU',

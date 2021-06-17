@@ -38,7 +38,9 @@ It is probably not a coincidence; here is some more evidence against this user:
 
 ${createTable(plagiarismCase.additional)}
 
-beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned for karma manipulation. Don't feel bad, they are probably a bot too.`
+beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned for karma manipulation. Don't feel bad, they are probably a bot too.
+
+Confused? Read the [FAQ](https://www.reddit.com/user/reply-guy-bot/comments/n9fpva/faq/) for info on how I work and why I exist.`
 }
 
 function createTable (plagiarismCases) {
@@ -50,8 +52,8 @@ function createTable (plagiarismCases) {
 
 function truncate(body) {
   const escapedBody = body.replace(/[\]\n\|\\]/g, ' ')
-  return escapedBody.length > 30
-    ? escapedBody.slice(0, 30) + '...'
+  return escapedBody.length > 25
+    ? escapedBody.slice(0, 25).trim() + '...'
     : escapedBody
 }
 

@@ -22,11 +22,16 @@ module.exports = function findPlagiarismCases (posts) {
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments.filter(commentFilter))
+    Object.entries(commentsByBody).forEach(([body, comments]) => {
+      if (body === '> Why does the mom look so conservative tho') {
+        console.log('comments', comments)
+      }
+    })
 
     // If there are more matches than that, could be memery.
     // If bots start double posting, bump this filter up.
     return Object.values(commentsByBody)
-      .filter(similarComments => similarComments.length === 2)
+      .filter(similarComments => similarComments.length > 1 && similarComments.length < 4)
       .map((similarComments) => {
         const [ original, ...copies ] = sortBy(similarComments, 'created')
         return copies
