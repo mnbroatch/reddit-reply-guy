@@ -1,4 +1,6 @@
-// TODO: error handling
+// Most of these functions (not asyncReduce) discard rejections!
+// Only to be used if rare failures aren't worth retrying
+
 async function asyncReduce(arr = [], cb, initial = arr) {
   let acc = initial
   for (let i = 0, len = arr.length; i < len; i++) {
