@@ -40,7 +40,7 @@ ${createTable(plagiarismCase.additional)}
 
 beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned for karma manipulation. Don't feel bad, they are probably a bot too.
 
-Confused? Read the [FAQ](https://www.reddit.com/user/reply-guy-bot/comments/n9fpva/faq/) for info on how I work and why I exist.`
+Confused? Read the [FAQ](https://www.reddit.com/user/reply-guy-bot/comments/n9fpva/faq/?plagiarist=${plagiarismCase.author}) for info on how I work and why I exist.`
 }
 
 function createTable (plagiarismCases) {

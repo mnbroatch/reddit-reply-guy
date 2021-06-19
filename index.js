@@ -1,22 +1,9 @@
+const fs = require('fs')
 const cache = require('./cache')
 const { asyncMapSerial } = require('./async-array-helpers')
 const run = require('./run')
 
 const subreddits = [
-  'OutOfTheLoop',
-  'legaladvice',
-  'ThatsInsane',
-  'Bad_Cop_No_Donut',
-  'Terraria',
-  'cringepics',
-  'EscapefromTarkov',
-  'AmItheAsshole',
-  'discordapp',
-  'pcmasterrace',
-  'anime',
-  'ffxiv',
-  'DotA2',
-  'MadeMeSmile',
   'Wellthatsucks',
   'Amd',
   'GlobalOffensive',
@@ -128,64 +115,55 @@ const subreddits = [
   'me_irl',
   'WTF',
   'iamatotalpieceofshit',
+  'OutOfTheLoop',
+  'legaladvice',
+  'ThatsInsane',
+  'Bad_Cop_No_Donut',
+  'Terraria',
+  'cringepics',
+  'EscapefromTarkov',
+  'AmItheAsshole',
+  'discordapp',
+  'pcmasterrace',
+  'anime',
+  'ffxiv',
+  'DotA2',
+  'MadeMeSmile',
 ]
 
-;(async function () {
-  let plagiarismCases = []
-  let authors = [
-    'wafflepiezz',
-    'SiomarTehBeefalo',
-    'leocharredkdk7d65',
-    'SerEx0',
-    'siumai',
-    'naivathco',
-    'claykrebs',
-    '666ithink',
-    'Konsur42',
-    '2danielshiao',
-    'ThisIsBooShit',
-    'man_gomer_lot',
-    'e14d',
-    'Slaisa',
-    'Inevitable-Pool-1083',
-  ]
-
-  try {
-    while (true) {
-      try {
-        await asyncMapSerial(
-          subreddits,
-          async (subreddit) => {
-            try {
-              const remainder = await run({
-                subreddit,
-                plagiarismCases,
-                authors,
-                printTable: true
-              })
-              plagiarismCases = remainder.plagiarismCases
-              authors = remainder.authors
-            } catch (e) {
-              console.error(`something went wrong:`)
-              console.error(e)
-            }
-          }
-        )
-      } catch (e) {
-        console.error(`something went wrong:`)
-        console.error(e)
-      }
-    }
-  } catch (e) {
-    console.log('e', e)
+let savestate
+try {
+  savestate = JSON.parse(fs.readFileSync('./db/savestate.json'))
+} catch (e) {
+  savestate = {
+    subreddit: subreddits[0],
+    authors: [],
+    plagiarismCases: [],
   }
+}
 
+;(async function () {
+  while (true) {
+    try {
+      const remainder = await run({
+        printTable: true,
+        ...savestate
+      })
+      savestate.plagiarismCases = remainder.plagiarismCases
+      savestate.authors = remainder.authors
+      savestate.subreddit = subreddits[(subreddits.indexOf(subreddit) + 1) % subreddits.length]
+    } catch (e) {
+      console.error(`something went wrong:`)
+      console.error(e)
+    }
+  }
 })()
 
 ;['beforeExit', 'SIGINT', 'SIGUSR1', 'SIGUSR2', 'uncaughtException', 'SIGTERM'].forEach((eventType) => {
   process.on(eventType, () => {
     console.log('goodbye')
     cache.backupToFile()
+    fs.writeFileSync( './db/savestate.json', JSON.stringify(savestate))
     process.exit()
   })
 })
