@@ -162,8 +162,9 @@ class Api {
     if (canTryImageSearch(post)) {
       try {
         const matches = (await axios.get(
-          `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`
-          )).data.matches.map(match => match.post.post_id)
+          `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`,
+          { timeout: 1000 * 60 * 2 }
+        )).data.matches.map(match => match.post.post_id)
 
         // If there are too many hits from the image search,
         // we won't trust them. Perhaps a subtle meme format.
@@ -172,6 +173,7 @@ class Api {
           ? matches
           : []
       } catch (e) {
+        // fails often enough not to care if it does
       }
     }
 

@@ -20,7 +20,7 @@ class Cache {
     }
   }
 
-  //  cache promises to handle parallel requests.
+  //  cache promises to handle duplicate requests.
   //  replace promise with actual value for serialization
   register(func, context) {
     return (async function () {
@@ -35,6 +35,8 @@ class Cache {
         return maybeResult
       } else {
         const resultPromise = func.call(context, ...arguments)
+        resultPromise.args = JSON.stringify(arguments, null, 2) // just for troubleshooting stalled promise, temp
+        resultPromise.func = func // just for troubleshooting stalled promise, temp
         this._cache.set(
           cacheKey,
           resultPromise

@@ -5,6 +5,7 @@ const Data = require('./data')
 const uniqBy = require('lodash/uniqBy')
 const groupBy = require('lodash/groupBy')
 const findPlagiarismCases = require('./find-plagiarism-cases')
+const commentFilter = require('./comment-filter')
 const plagiarismCaseFilter = require('./plagiarism-case-filter')
 const {
   createReplyText,
@@ -32,6 +33,7 @@ const subsThatRequestModmail = [
 ]
 
 const subredditsThatDisallowBots = [
+  'seinfeld',
   'ElectricForest',
   'BoneAppleTea',
   'AnimalCrossing',
@@ -93,19 +95,21 @@ async function run ({
   postIds.length && console.log(`searching postIds: ${postIds}`)
 
   ;(await asyncMap(postIds, api.getPost))
-    .flat()
+    .map(post => ({ ...post, comments: post.comments.filter(commentFilter) }))
     .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
     .forEach(data.setPost)
 
   ;(await asyncMap(subreddits, api.getSubredditPosts))
     .flat()
+    .map(post => ({ ...post, comments: post.comments.filter(commentFilter) }))
     .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
     .forEach(data.setPost)
 
-  // ignore inactive authors
   const commentsPerAuthor = (await asyncMap(uniqBy(authors), api.getAuthorComments))
-    .filter(authorComments => authorComments.length)
+    .map(authorComments => authorComments.filter(commentFilter))
     .filter((authorComments) => {
+      if (!authorComments.length) return false
+      // ignore inactive authors
       authorComments.sort((a, b) => b.created - a.created)
       const isActive = authorComments[0].created * 1000 > Date.now() - MAX_COMMENT_AGE
       if (!isActive) {
@@ -116,7 +120,7 @@ async function run ({
 
   await asyncMap(
     Object.entries(groupBy(
-      (commentsPerAuthor).flat(),
+      commentsPerAuthor.flat(),
       'link_id'
     )),
     async ([postId, comments]) => {
@@ -127,7 +131,7 @@ async function run ({
           comments: uniqBy(
             [ ...post.comments, ...comments ],
             'id'
-          )
+          ).filter(commentFilter)
         })
       }
     }

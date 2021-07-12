@@ -12,10 +12,12 @@ const authorWhitelist = [
   'Jaysog',
   'CryptoFutureBot',
   '[deleted]',
+  'pekofy_bot',
 ]
 
 const subredditWhitelist = [
   'SpotaTroll',
+  'AmITheDevil',
   'Genshin_Memepact',
   'FreeKarma4U',
   'Superstonk',
@@ -24,44 +26,42 @@ const subredditWhitelist = [
   'steam_giveaway',
   'giveaways',
   'copypasta',
+  'CelebAssPussyMouth',
 ]
 
 const criteria = [
   {
+    description: 'Is subreddit not the author\'s personal subreddit?',
+    test: (comment) => comment.subreddit.display_name.toLowerCase() !== `u_${comment.author.name.toLowerCase()}`
+  },
+  {
     description: 'Is subreddit not whitelisted?',
-    test: (maybeCopy) =>
+    test: (comment) =>
       !subredditWhitelist
-        .find(subreddit => {
-          if (!maybeCopy.subreddit) {
-            console.log('maybeCopy', maybeCopy)
-          }
-          return subreddit.toLowerCase() === maybeCopy.subreddit.display_name.toLowerCase()
-        })
+        .find(subreddit => subreddit.toLowerCase() === comment.subreddit.display_name.toLowerCase())
   },
   {
     description: 'Is author not whitelisted?',
-    test: (maybeCopy) =>
-      !authorWhitelist.includes(maybeCopy.author.name),
+    test: (comment) => !authorWhitelist.includes(comment.author.name),
   },
   {
     description: 'Is body not primarily a reddit shorthand link?',
-    test: (maybeCopy) => {
+    test: (comment) => {
       // TODO: fix this; why first word?
-      const firstWord = maybeCopy.body.split(' ')[0]
-      return maybeCopy.body.length > firstWord.length * 2
+      const firstWord = comment.body.split(' ')[0]
+      return comment.body.length > firstWord.length * 2
         || !/^\/?[ur]\//.test(firstWord)
     },
   },
   {
     description: 'Is comment actually there?',
-    test: (maybeCopy) => 
-      maybeCopy.body !== '[removed]'
-      && maybeCopy.body !== '[deleted]'
+    test: (comment) => 
+      comment.body !== '[removed]'
+      && comment.body !== '[deleted]'
   },
   {
     description: 'Is body long enough?',
-    test: (maybeCopy) =>
-      maybeCopy.body.length > MIN_COMMENT_LENGTH,
+    test: (comment) => comment.body.length > MIN_COMMENT_LENGTH,
   },
 ]
 

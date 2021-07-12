@@ -2,9 +2,9 @@ const fs = require('fs')
 const cache = require('./cache')
 const { asyncMapSerial } = require('./async-array-helpers')
 const run = require('./run')
+const pickBy = require('lodash/pickBy')
 
 const subreddits = [
-  'Wellthatsucks',
   'Amd',
   'GlobalOffensive',
   'technology',
@@ -129,11 +129,15 @@ const subreddits = [
   'ffxiv',
   'DotA2',
   'MadeMeSmile',
+  'Wellthatsucks',
 ]
 
 let savestate
 try {
   savestate = JSON.parse(fs.readFileSync('./db/savestate.json'))
+  savestate.authors = savestate.authors
+    .concat([ // sneak in more authors here on startup
+   ])
 } catch (e) {
   savestate = {
     subreddit: subreddits[0],
@@ -142,20 +146,38 @@ try {
   }
 }
 
+async function search () {
+  try {
+    const remainder = await run({
+      printTable: true,
+      ...savestate
+    })
+    savestate.plagiarismCases = remainder.plagiarismCases
+    savestate.authors = remainder.authors
+    savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
+  } catch (e) {
+    console.error(`something went wrong:`)
+    console.error(e)
+  }
+}
+
+// investigating weird hangs
+let timeout = 0
 ;(async function () {
   while (true) {
-    try {
-      const remainder = await run({
-        printTable: true,
-        ...savestate
-      })
-      savestate.plagiarismCases = remainder.plagiarismCases
-      savestate.authors = remainder.authors
-      savestate.subreddit = subreddits[(subreddits.indexOf(subreddit) + 1) % subreddits.length]
-    } catch (e) {
-      console.error(`something went wrong:`)
-      console.error(e)
-    }
+    const start = Date.now()
+    timeout = setTimeout(() => {
+      console.log('timeout')
+      console.log('savestate: ', savestate)
+      const pendingpromises = pickBy(
+        cache._cache.data,
+        value => Object.prototype.toString.call(value.v) === '[object Promise]'
+      )
+      console.log('pendingpromises', pendingpromises)
+    }, 1000 * 60 * 60)
+    await search()
+    clearTimeout(timeout)
+    console.log('Date.now() - start', Date.now() - start)
   }
 })()
 

@@ -3,7 +3,6 @@ const groupBy = require('lodash/groupBy')
 const uniqBy = require('lodash/uniqBy')
 const isSimilar = require('./is-similar')
 const stripQuotes = require('./strip-quotes')
-const commentFilter = require('./comment-filter')
 const commentPairFilter = require('./comment-pair-filter')
 
 module.exports = function findPlagiarismCases (posts) {
@@ -21,7 +20,7 @@ module.exports = function findPlagiarismCases (posts) {
 
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
-    const commentsByBody = groupCommentsBySimilarBody(comments.filter(commentFilter))
+    const commentsByBody = groupCommentsBySimilarBody(comments)
     Object.entries(commentsByBody).forEach(([body, comments]) => {
       if (body === '> Why does the mom look so conservative tho') {
         console.log('comments', comments)
