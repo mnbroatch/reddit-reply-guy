@@ -14,25 +14,9 @@ const {
     // postId: 'nyhjap',
     // subreddit: 'Instagram',
     authors: [
-      'Afraid_Newspaper_979',
-      'RevolutionaryToe1626',
-      'BrianCrowley',
-      'EarlMGoodman',
-      'EricLOlson',
-      'ErnestEAquilar',
-      'GwendolynKirkley',
-      'IvetteCramer',
-      'JerryJWhiting',
-      'JerrySMuncy',
-      'LauraRHarrison',
-      'MandyQuinn',
-      'MelindaCHernandez',
-      'MichaelARevis',
-      'PerryMWilson',
-      'ScottClements',
-      'worried_ad4262',
+      'XxbloxloverxX'
     ],
-    // dryRun: true,
+    dryRun: true,
     printTable: true
   })
   console.log(JSON.stringify(authors, null, 2))

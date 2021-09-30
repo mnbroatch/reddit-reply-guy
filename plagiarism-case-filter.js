@@ -11,12 +11,10 @@ const criteria = [
   {
     description: 'Is the comment not already reported?',
     test: async ({ copy }) => {
-      // remove isCommentAlreadyRepliedTo after jun 9
-      let x = await api.hasCommentBeenReported(copy)
-      if (x) {
+      if (await api.hasCommentBeenReported(copy)) {
         console.log(`ignoring responded-to comment: ${copy.permalink}`)
       }
-      return !x && !await api.isCommentAlreadyRepliedTo(copy)
+      return !x
     }
   },
 ]

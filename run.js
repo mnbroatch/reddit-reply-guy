@@ -96,7 +96,7 @@ async function run ({
 
   ;(await asyncMap(postIds, api.getPost))
     .map(post => ({ ...post, comments: post.comments.filter(commentFilter) }))
-    .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
+    .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase()))) // can this be moved up a line?
     .forEach(data.setPost)
 
   ;(await asyncMap(subreddits, api.getSubredditPosts))

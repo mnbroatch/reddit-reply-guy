@@ -27,6 +27,9 @@ const subredditWhitelist = [
   'giveaways',
   'copypasta',
   'CelebAssPussyMouth',
+  'pickoneceleb',
+  'CelebEconoy',
+  'CelebWouldYouRather',
 ]
 
 const criteria = [

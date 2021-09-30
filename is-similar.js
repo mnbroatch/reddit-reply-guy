@@ -1,7 +1,9 @@
 const compareTwoStrings = require('string-similarity').compareTwoStrings
 const stripQuotes = require('./strip-quotes')
 
-module.exports = function isSimilar(str1, str2, threshold = .85) {
+const SIMILARITY_THRESHOLD = +process.env.SIMILARITY_THRESHOLD
+
+module.exports = function isSimilar(str1, str2, threshold = SIMILARITY_THRESHOLD) {
   const str1WithoutQuotes = stripQuotes(str1)
   const str2WithoutQuotes = stripQuotes(str2)
   if (str1WithoutQuotes.length > 5) {
