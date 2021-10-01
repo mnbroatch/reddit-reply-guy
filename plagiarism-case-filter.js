@@ -13,8 +13,10 @@ const criteria = [
     test: async ({ copy }) => {
       if (await api.hasCommentBeenReported(copy)) {
         console.log(`ignoring responded-to comment: ${copy.permalink}`)
+        return false
+      } else {
+        return true
       }
-      return !x
     }
   },
 ]
