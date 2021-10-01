@@ -11,10 +11,10 @@ const {
 ;(async function () {
 
   const { authors } = await run({
-    // postId: 'nyhjap',
+    // postId: 'pwg197',
     // subreddit: 'Instagram',
     authors: [
-      'XxbloxloverxX'
+      'konsghjghjgh'
     ],
     dryRun: true,
     printTable: true

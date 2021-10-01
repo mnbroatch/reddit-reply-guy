@@ -20,18 +20,29 @@ const criteria = [
   },
   {
     description: 'Is a whole long thread not being copied?',
-    test: (maybeCopy, original, comments) => !isThreadSectionCopied(maybeCopy, original, comments, 5)
+    test: (maybeCopy, original, comments) => {
+      const result = !isThreadSectionCopied(maybeCopy, original, comments, 5)
+
+      // temp to examine potential false negatives
+      if (!result) {
+        console.log(`new test failed, long thread copied:`)
+        console.log('maybeCopy', maybeCopy)
+        console.log('original', original)
+      }
+
+      return result
+    }
   },
 ]
 
 // If a long section of thread is copied, we consider it a meme like redditsings.
 // Strategy will be to search ancestors up and child paths down
 // until we either have N matches or a mismatch on both ends.
+// Issue: We will have thrown away some comments by this point (too short, etc.)
 function isThreadSectionCopied(maybeCopy, original, comments, threadSectionMatchThreshold = 5) {
   let ancestorMatchCount = 0
   let currentMaybeCopyAncestor = maybeCopy.ancestors[ancestorMatchCount]
   let currentOriginalAncestor = original.ancestors[ancestorMatchCount]
-  console.log('maybeCopy.body', maybeCopy.body)
   while (
     currentMaybeCopyAncestor
       && currentOriginalAncestor
@@ -43,8 +54,6 @@ function isThreadSectionCopied(maybeCopy, original, comments, threadSectionMatch
     currentOriginalAncestor = original.ancestors[ancestorMatchCount]
   }
 
-  console.log('ancestorMatchCount', ancestorMatchCount)
-  console.log("===========================")
   const necessaryChildMatchCount = threadSectionMatchThreshold - ancestorMatchCount
 
   return necessaryChildMatchCount <= 0
@@ -96,28 +105,17 @@ function isCopiedTreeLargeRecursive(node1, node2, comments, threshold) {
 
 module.exports = function (maybeCopy, original, comments) {
   return criteria.every(
-    criterion => {
-      const result = criterion.test(
-        {
-          ...maybeCopy,
-          ancestors: getAncestors(maybeCopy, comments),
-        },
-        {
-          ...original,
-          ancestors: getAncestors(original, comments),
-        },
-        comments
-      )
-
-      // temp to examine potential false negatives
-      if (criterion.description === 'Is a whole long thread not being copied?' && !result) {
-        console.log(`new test failed, long thread copied:`)
-        console.log('maybeCopy', maybeCopy)
-        console.log('original', original)
-      }
-
-      return result
-    }
+    criterion => criterion.test(
+      {
+        ...maybeCopy,
+        ancestors: getAncestors(maybeCopy, comments),
+      },
+      {
+        ...original,
+        ancestors: getAncestors(original, comments),
+      },
+      comments
+    )
   )
 }
 

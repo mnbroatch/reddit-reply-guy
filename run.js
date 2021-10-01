@@ -152,6 +152,7 @@ async function run ({
           if (dupe) {
             data.setPost({
               ...dupe,
+              comments: dupe.comments.filter(commentFilter),
               duplicatePostIds,
             })
           }
@@ -161,7 +162,6 @@ async function run ({
   )
 
   const plagiarismCases = uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id')
-  console.log('plagiarismCases.length', plagiarismCases.length)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
   const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)

@@ -64,7 +64,7 @@ const criteria = [
   },
   {
     description: 'Is body long enough?',
-    test: (comment) => comment.body.length > MIN_COMMENT_LENGTH,
+    test: (comment) => comment.body.length >= MIN_COMMENT_LENGTH
   },
 ]
 
