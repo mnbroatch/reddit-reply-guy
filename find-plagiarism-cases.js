@@ -41,7 +41,7 @@ module.exports = function findPlagiarismCases (posts) {
   })
   .flat()
 
-  // All this to avoid dinging repetitive individuals
+  // All this to avoid dinging repetitive individuals who only post "nice cat", etc.
   const plagiarists = uniqBy(maybePlagiarismCases.map(plagiarismCase => plagiarismCase.author))
   const plagiaristsComments = posts
     .map(post => post.comments).flat()

@@ -14,9 +14,9 @@ const {
     // postId: 'pwg197',
     // subreddit: 'Instagram',
     authors: [
-      'arebentivzxcvzs'
+      'Killer_radio'
     ],
-    // dryRun: true,
+    dryRun: true,
     printTable: true
   })
   console.log(JSON.stringify(authors, null, 2))

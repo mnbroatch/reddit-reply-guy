@@ -25,7 +25,7 @@ const criteria = [
 
       // temp to examine potential false negatives
       if (!result) {
-        console.log(`new test failed, long thread copied:`)
+        console.log(`malarkey! new test failed, long thread copied:`)
         console.log('maybeCopy', maybeCopy)
         console.log('original', original)
       }
