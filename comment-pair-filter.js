@@ -1,3 +1,4 @@
+const uniqBy = require('lodash/uniqBy')
 const isSimilar = require('./is-similar')
 const groupCommentsBySimilarBody = require('./group-comments-by-similar-body')
 
@@ -25,14 +26,14 @@ const criteria = [
       // If a long thread is copied, we consider it a meme like redditsings.
       // We remain agnostic about comment placement in the heirarchy because
       // people don't remember lyrics in the right order.
-      const relatedComments = [
+      const relatedComments = uniqBy([
         ...maybeCopy.ancestors,
         ...original.ancestors,
         maybeCopy,
         original,
         ...getDescendants(maybeCopy, comments),
         ...getDescendants(original, comments)
-      ]
+      ], 'id')
 
       const commentsByBody = groupCommentsBySimilarBody(relatedComments, SIMILARITY_THRESHOLD_LOOSE)
       const copiedBodyCount = Object.values(commentsByBody).filter(similarComments => similarComments.length > 1).length

@@ -14,7 +14,7 @@ const {
     // postId: 'pwg197',
     // subreddit: 'Instagram',
     authors: [
-      'Killer_radio'
+      'tpxdjzukry'
     ],
     dryRun: true,
     printTable: true
