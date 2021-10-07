@@ -17,7 +17,6 @@ const commentsDb = new JSONdb('db/comments.json')
 
 const INITIAL_POST_LIMIT = +process.env.INITIAL_POST_LIMIT 
 const AUTHOR_POST_LIMIT = +process.env.AUTHOR_POST_LIMIT
-const REPLY_BOT_USERS = JSON.parse(process.env.REPLY_BOT_USERS)
 
 const {
   CLIENT_ID,
@@ -109,24 +108,6 @@ class Api {
     } catch (e) {
       console.log(`couldn't get comments by: ${author}`)
       return []
-    }
-  }
-
-  async isCommentAlreadyRepliedTo(comment) {
-    try {
-      return comment.replyAuthors.some(
-        author => REPLY_BOT_USERS.some(
-          user => user.toLowerCase() === author.toLowerCase() 
-        )
-      ) || (await snoowrap.getComment(comment.id).expandReplies({ depth: 1 }).replies)
-        .some(
-          reply => REPLY_BOT_USERS.some(
-            user => user.toLowerCase() === reply.author.name.toLowerCase() 
-          )
-        )
-    } catch (e) {
-      console.log(`couldn't get replies for comment: http://reddit.com${comment.permalink}`)
-      return true
     }
   }
 
