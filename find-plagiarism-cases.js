@@ -4,6 +4,7 @@ const uniqBy = require('lodash/uniqBy')
 const isSimilar = require('./is-similar')
 const stripQuotes = require('./strip-quotes')
 const commentPairFilter = require('./comment-pair-filter')
+const groupCommentsBySimilarBody = require('./group-comments-by-similar-body')
 
 module.exports = function findPlagiarismCases (posts) {
   const commentsPerPostWithDupes = Object.values(
@@ -21,11 +22,6 @@ module.exports = function findPlagiarismCases (posts) {
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments)
-    Object.entries(commentsByBody).forEach(([body, comments]) => {
-      if (body === '> Why does the mom look so conservative tho') {
-        console.log('comments', comments)
-      }
-    })
 
     // If there are more matches than that, could be memery.
     // If bots start double posting, bump this filter up.
@@ -59,17 +55,4 @@ module.exports = function findPlagiarismCases (posts) {
     .filter(plagiarismCase => !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id)))
 }
 
-function groupCommentsBySimilarBody (comments, threshold = .85) {
-  return comments.reduce((acc, comment) => {
-    const strippedBody = stripQuotes(comment.body)
-    const body = strippedBody.length > 5
-      ? strippedBody
-      : comment.body
-
-    const maybeKey = Object.keys(acc).find(key => isSimilar(body, key, threshold))
-    return maybeKey
-      ? { ...acc, [maybeKey]: [ ...acc[maybeKey], comment ] }
-      : { ...acc, [body]: [comment] }
-  }, {})
-}
 

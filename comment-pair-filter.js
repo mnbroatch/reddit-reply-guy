@@ -1,4 +1,5 @@
 const isSimilar = require('./is-similar')
+const groupCommentsBySimilarBody = require('./group-comments-by-similar-body')
 
 const SIMILARITY_THRESHOLD_LOOSE = +process.env.SIMILARITY_THRESHOLD_LOOSE
 
@@ -21,44 +22,40 @@ const criteria = [
   {
     description: 'Is a whole long thread not being copied?',
     test: (maybeCopy, original, comments) => {
-      const result = !isThreadSectionCopied(maybeCopy, original, comments, 5)
+      // If a long thread is copied, we consider it a meme like redditsings.
+      // We remain agnostic about comment placement in the heirarchy because
+      // people don't remember lyrics in the right order.
+      const relatedComments = [
+        ...maybeCopy.ancestors,
+        ...original.ancestors,
+        maybeCopy,
+        original,
+        ...getDescendants(maybeCopy, comments),
+        ...getDescendants(original, comments)
+      ]
+
+      const commentsByBody = groupCommentsBySimilarBody(relatedComments, SIMILARITY_THRESHOLD_LOOSE)
+      const copiedBodyCount = Object.values(commentsByBody).filter(similarComments => similarComments.length > 1).length
+      const result = copiedBodyCount < 5
 
       // temp to examine potential false negatives
       if (!result) {
+        console.log(`------------------------`)
         console.log(`malarkey! new test failed, long thread copied:`)
-        console.log('maybeCopy', maybeCopy)
-        console.log('original', original)
+        console.log('copiedBodyCount', copiedBodyCount)
+        console.log('maybeCopy.author', maybeCopy.author)
+        console.log()
+        console.log(maybeCopy.body)
+        console.log(`https://reddit.com${maybeCopy.permalink}`)
+        console.log('original.author', original.author)
+        console.log(original.body)
+        console.log(`https://reddit.com${original.permalink}`)
       }
 
       return result
     }
   },
 ]
-
-// If a long section of thread is copied, we consider it a meme like redditsings.
-// Strategy will be to search ancestors up and child paths down
-// until we either have N matches or a mismatch on both ends.
-// Issue: We will have thrown away some comments by this point (too short, etc.)
-function isThreadSectionCopied(maybeCopy, original, comments, threadSectionMatchThreshold = 5) {
-  let ancestorMatchCount = 0
-  let currentMaybeCopyAncestor = maybeCopy.ancestors[ancestorMatchCount]
-  let currentOriginalAncestor = original.ancestors[ancestorMatchCount]
-  while (
-    currentMaybeCopyAncestor
-      && currentOriginalAncestor
-      && isSimilar(currentMaybeCopyAncestor.body, currentOriginalAncestor.body, SIMILARITY_THRESHOLD_LOOSE)
-      && ancestorMatchCount < threadSectionMatchThreshold
-  ) {
-    ancestorMatchCount++
-    currentMaybeCopyAncestor = maybeCopy.ancestors[ancestorMatchCount]
-    currentOriginalAncestor = original.ancestors[ancestorMatchCount]
-  }
-
-  const necessaryChildMatchCount = threadSectionMatchThreshold - ancestorMatchCount
-
-  return necessaryChildMatchCount <= 0
-    || isCopiedTreeLargeRecursive(maybeCopy, original, comments, necessaryChildMatchCount)
-}
 
 function getAncestors(comment, comments) {
   const ancestors = []
@@ -79,28 +76,9 @@ function getChildren(comment, comments) {
   return comments.filter((c) => c.parent_id == comment.name)
 }
 
-function isCopiedTreeLargeRecursive(node1, node2, comments, threshold) {
-  if (!isSimilar(node1.body, node2.body, SIMILARITY_THRESHOLD_LOOSE)) return false
-  if (threshold === 1) return true
-
-  const node1Children = getChildren(node1, comments)
-  const node2Children = getChildren(node2, comments)
-
-  const validPaths = node1Children.reduce((acc, node1Child) => {
-    const node2ChildMatches = node2Children.filter(node2Child => isSimilar(node2Child.body, node1Child.body, SIMILARITY_THRESHOLD_LOOSE))
-    if (node2ChildMatches.length > 0) {
-      return [
-        ...acc,
-        ...node2ChildMatches.map(node2Child => ({ node1: node1Child, node2: node2Child }))
-      ]
-    } else {
-      return acc
-    }
-  }, [])
-
-  if (!validPaths.length) return false
-
-  return validPaths.some(path => isCopiedTreeLargeRecursive(path.node1, path.node2, comments, threshold - 1))
+function getDescendants(comment, comments) {
+  const children = getChildren(comment, comments)
+  return children.reduce((acc, child) => [ ...acc, ...getDescendants(child, comments) ], [...children])
 }
 
 module.exports = function (maybeCopy, original, comments) {
