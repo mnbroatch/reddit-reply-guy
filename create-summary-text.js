@@ -14,7 +14,7 @@ function createModmailText (plagiarismCase) {
 
 Original: ${plagiarismCase.original.permalink}
 
-Additional evidence against plagiarist:
+Additional evidence against /u/${plagiarismCase.author}:
 
 ${createTable(plagiarismCase.additional)}`
 }

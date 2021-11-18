@@ -79,6 +79,7 @@ class Api {
         domain: await post.domain,
         removed_by_category: await post.removed_by_category,
         title: await post.title,
+        selftext: await post.selftext,
       }
       console.log(`retrieved post: ${postId}`)
       return new Post(unwrappedPost)
@@ -142,10 +143,20 @@ class Api {
 
     if (canTryImageSearch(post)) {
       try {
+        // Regular timeout parameter doesn't work if internet is down or other things:
+        // https://stackoverflow.com/questions/36690451/timeout-feature-in-the-axios-library-is-not-working
+        const source = axios.CancelToken.source()
+        const timeout = setTimeout(() => {
+          source.cancel()
+        }, 1000 * 60 * 2)
+
         const matches = (await axios.get(
           `https://api.repostsleuth.com/image?filter=true&url=https:%2F%2Fredd.it%2Fn9p6fa&postId=${post.id}&same_sub=false&filter_author=false&only_older=false&include_crossposts=true&meme_filter=false&target_match_percent=90&filter_dead_matches=false&target_days_old=0`,
-          { timeout: 1000 * 60 * 2 }
+          { cancelToken: source.token }
+          // { timeout: 1000 * 60 * 2 }
         )).data.matches.map(match => match.post.post_id)
+
+        clearTimeout(timeout)
 
         // If there are too many hits from the image search,
         // we won't trust them. Perhaps a subtle meme format.

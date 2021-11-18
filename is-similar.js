@@ -12,5 +12,5 @@ module.exports = function isSimilar(str1, str2, threshold = SIMILARITY_THRESHOLD
   if (str2WithoutQuotes.length > 5) {
     str2 = str2WithoutQuotes
   }
-  return compareTwoStrings(str1, str2) > threshold
+  return compareTwoStrings(str1.toLowerCase(), str2.toLowerCase()) > threshold
 }

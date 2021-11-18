@@ -20,6 +20,7 @@ module.exports = function findPlagiarismCases (posts) {
   console.log('posts.length', posts.length)
 
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
+    const post = posts.find(p => p.id === comments[0]?.link_id)
     console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments)
 
@@ -30,7 +31,7 @@ module.exports = function findPlagiarismCases (posts) {
       .map((similarComments) => {
         const [ original, ...copies ] = sortBy(similarComments, 'created')
         return copies
-          .filter(copy => commentPairFilter(copy, original, comments))
+          .filter(copy => commentPairFilter(copy, original, comments, post))
           .map(copy => ({ copy, original, author: copy.author.name }))
       })
       .flat()

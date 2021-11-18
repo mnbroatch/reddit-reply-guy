@@ -30,6 +30,7 @@ const subsThatDemandOneReportPerAuthor = [
 
 const subsThatRequestModmail = [
   'movies',
+  'Unexpected',
 ]
 
 const subredditsThatDisallowBots = [

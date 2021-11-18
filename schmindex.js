@@ -11,12 +11,12 @@ const {
 ;(async function () {
 
   const { authors } = await run({
-    // postId: 'pwg197',
-    // subreddit: 'Instagram',
+    // postId: 'qdbocr',
+    subreddit: 'oldschoolcool',
     authors: [
-      'tpxdjzukry'
+      'armigum',
     ],
-    dryRun: true,
+    // dryRun: true,
     printTable: true
   })
   console.log(JSON.stringify(authors, null, 2))

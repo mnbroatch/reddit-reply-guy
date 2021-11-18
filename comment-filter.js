@@ -13,6 +13,7 @@ const authorWhitelist = [
   'CryptoFutureBot',
   '[deleted]',
   'pekofy_bot',
+  'FuturologyBot',
 ]
 
 const subredditWhitelist = [
@@ -30,6 +31,8 @@ const subredditWhitelist = [
   'pickoneceleb',
   'CelebEconoy',
   'CelebWouldYouRather',
+  'copypasta_es',
+  'music_survivor',
 ]
 
 const criteria = [

@@ -11,6 +11,7 @@ module.exports = class Post {
     domain,
     removed_by_category,
     title,
+    selftext,
   } = post
 
     if (!comments) {
@@ -24,6 +25,7 @@ module.exports = class Post {
     this.domain = domain
     this.removed_by_category = removed_by_category
     this.title = title
+    this.selftext = selftext || ''
   }
 }
 

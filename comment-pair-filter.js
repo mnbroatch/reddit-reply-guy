@@ -21,6 +21,10 @@ const criteria = [
     test: (maybeCopy) => !maybeCopy.ancestors.some(ancestor => isSimilar(maybeCopy.body, ancestor.body))
   },
   {
+    description: 'Is the comment different from post body?', // really only happens in copypasta subs
+    test: (maybeCopy, original, comments, post) => !isSimilar(maybeCopy.body, post.selftext)
+  },
+  {
     description: 'Is a whole long thread not being copied?',
     test: (maybeCopy, original, comments) => {
       // If a long thread is copied, we consider it a meme like redditsings.
@@ -51,6 +55,7 @@ const criteria = [
         console.log('original.author', original.author)
         console.log(original.body)
         console.log(`https://reddit.com${original.permalink}`)
+        console.log(`------------------------`)
       }
 
       return result
@@ -82,7 +87,7 @@ function getDescendants(comment, comments) {
   return children.reduce((acc, child) => [ ...acc, ...getDescendants(child, comments) ], [...children])
 }
 
-module.exports = function (maybeCopy, original, comments) {
+module.exports = function (maybeCopy, original, comments, post) {
   return criteria.every(
     criterion => criterion.test(
       {
@@ -93,7 +98,8 @@ module.exports = function (maybeCopy, original, comments) {
         ...original,
         ancestors: getAncestors(original, comments),
       },
-      comments
+      comments,
+      post
     )
   )
 }
