@@ -1,3 +1,5 @@
+// for manual one-off runs
+
 const cache = require('./cache')
 const { asyncMapSerial } = require('./async-array-helpers')
 const run = require('./run')
@@ -12,9 +14,9 @@ const {
 
   const { authors } = await run({
     // postId: 'qdbocr',
-    subreddit: 'oldschoolcool',
+    // subreddit: 'oldschoolcool',
     authors: [
-      'armigum',
+      'Alon51',
     ],
     // dryRun: true,
     printTable: true
