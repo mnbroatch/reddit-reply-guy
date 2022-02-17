@@ -11,6 +11,11 @@ const criteria = [
       original.author.name !== maybeCopy.author.name 
   },
   {
+    description: 'Does the copy not credit the original author?',
+    test: (maybeCopy, original) => 
+      !maybeCopy.body.includes(original.author.name)
+  },
+  {
     description: 'Do non-root comments have different parents?',
     test: (maybeCopy, original) => 
       original.parent_id === original.link_id

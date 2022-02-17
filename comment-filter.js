@@ -25,6 +25,7 @@ const subredditWhitelist = [
   'CelebWouldYouRather',
   'CopyPastas',
   'DeFreeKarma',
+  'extrarfl',
   'FreeKarma4All',
   'FreeKarma4U',
   'FreeKarma4You',
