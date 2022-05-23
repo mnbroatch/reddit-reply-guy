@@ -53,6 +53,9 @@ const subredditWhitelist = [
   'steam_giveaway',
   'wlzqnueg',
   'xxxKarma',
+  'LoserleavesReddit',
+  'ApsaraBazaar',
+  'RandomActsofCards',
 ]
 
 const criteria = [

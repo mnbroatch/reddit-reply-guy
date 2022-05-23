@@ -75,6 +75,7 @@ const subredditsThatDisallowBots = [
 
 const whitelistedTitles = [
   'Game Winning Goal Challenge',
+  'loser leaves reddit',
 ]
 
 async function run ({
