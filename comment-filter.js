@@ -14,6 +14,7 @@ const authorWhitelist = [
   '[deleted]',
   'pekofy_bot',
   'FuturologyBot',
+  'NanoraBot',
 ]
 
 const subredditWhitelist = [
