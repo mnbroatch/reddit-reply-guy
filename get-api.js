@@ -312,11 +312,7 @@ class Api {
       const command = new PutObjectCommand({
         Bucket: 'redditreplyguy',
         Key: 'savestate',
-        Body: JSON.stringify({
-             subreddit: subreddits[0],
-             authors: [],
-             plagiarismCases: [],
-        }),
+        Body: JSON.stringify(savestate),
       });
 
       return this.s3Client.send(command);
