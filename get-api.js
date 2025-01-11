@@ -13,6 +13,7 @@ const cache = require('./cache')
 const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
+const subreddits = require('./subreddits')
 
 const authorsDb = new JSONdb('db/authors.json')
 const commentsDb = new JSONdb('db/comments.json')
