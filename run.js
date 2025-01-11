@@ -199,8 +199,6 @@ async function run ({
 
           await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
 
-          console.log('plagiarismCase', plagiarismCase)
-
           if (shouldReply(plagiarismCase)) {
             reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
             comment = plagiarismCase.copy
