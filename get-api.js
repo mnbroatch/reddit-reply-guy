@@ -301,7 +301,7 @@ class Api {
           Key: 'savestate',
         }),
       );
-      return await response.Body.transformToString();
+      return JSON.parse(await response.Body.transformToString());
     }
   }
 
