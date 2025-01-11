@@ -1,4 +1,4 @@
-const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
+const MIN_PLAGIARIST_CASES_FOR_REPORT = 5
 
 const subredditsThatDisallowUsernameLinks = [
   'politics',

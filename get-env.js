@@ -3,7 +3,7 @@ const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 let env
 async function getEnv () {
   if (env) return env
-  if (process.env.REDDIT_USER) { // from .env file
+  if (!process.env.IS_LOCAL) {
     env = {...process.env}
   } else {
     const ssmClient = new SSMClient({ region: "us-east-1" });

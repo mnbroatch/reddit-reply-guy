@@ -1,7 +1,7 @@
 const getApi = require('./get-api')
 const { asyncEvery } = require('./async-array-helpers')
 
-const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
+const MAX_COMMENT_AGE = 259200000
 
 const criteria = [
   {

@@ -1,6 +1,6 @@
 const stripQuotes = require('./strip-quotes')
 
-const MIN_COMMENT_LENGTH = +process.env.MIN_COMMENT_LENGTH 
+const MIN_COMMENT_LENGTH = 20
 
 const authorWhitelist = [
   'worldmobilemod',
