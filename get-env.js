@@ -1,6 +1,4 @@
-if (!process.env.REDDIT_USER) {
-  const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
-}
+const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 
 let env
 async function getEnv () {
