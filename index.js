@@ -27,11 +27,11 @@ async function search () {
 }
 
 ;(async function () {
-  // while (true) {
+  while (true) {
     console.log('time: ', (new Date()).toLocaleTimeString())
     const start = Date.now()
     await search()
     console.log(`search took ${Date.now() - start}ms`)
-  // }
+  }
 })()
 
