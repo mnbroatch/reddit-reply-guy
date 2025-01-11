@@ -17,8 +17,13 @@ const authorWhitelist = [
   'NanoraBot',
 ]
 
+// generally subs with a lot of memes or rigid formats
 const subredditWhitelist = [
   '196',
+  'lebowski',
+  'HIMYM',
+  'howimetyourmother',
+  'PrettyLittleLiars',
   'AmITheDevil',
   'AskOuija',
   'CelebAssPussyMouth',
