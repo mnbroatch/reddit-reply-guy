@@ -1,191 +1,188 @@
-const fs = require('fs')
 const cache = require('./cache')
-const { asyncMapSerial } = require('./async-array-helpers')
 const run = require('./run')
-const pickBy = require('lodash/pickBy')
+const getApi = require('./get-api')
+
+const DRY_RUN = false
 
 const subreddits = [
-  'Amd',
-  'GlobalOffensive',
-  'technology',
-  'MurderedByWords',
-  'Twitch',
-  'WhitePeopleTwitter',
-  'whatisthisthing',
-  'DestinyTheGame',
-  'AskMen',
-  'NintendoSwitch',
-  'TheLastAirbender',
-  'NBA2k',
-  'natureismetal',
-  'DnD',
-  'pathofexile',
-  'WinStupidPrizes',
-  'Jokes',
-  'sex',
-  'xboxone',
-  'CODWarzone',
-  '2007scape',
-  'Hololive',
-  'TwoXChromosomes',
-  'IdiotsInCars',
-  'mildlyinteresting',
-  'LifeProTips',
-  'techsupport',
-  'OnePiece',
-  'AskHistorians',
-  'iamverybadass',
-  'coolguides',
-  'Tinder',
-  'askscience',
-  'PSO2',
-  'classicwow',
-  'oddlysatisfying',
-  'AskWomen',
-  'Unexpected',
-  'VALORANT',
-  'IAmA',
-  'relationships',
-  'manga',
-  'dataisbeautiful',
-  'apple',
-  'insanepeoplefacebook',
-  'sysadmin',
-  'trashy',
-  'dndnext',
-  'apexlegends',
-  'pokemon',
-  'books',
-  'facepalm',
-  'Cringetopia',
-  'barstoolsports',
-  'cringe',
-  'FortNiteBR',
-  'totalwar',
-  'Whatcouldgowrong',
-  'fo76',
-  'MovieDetails',
-  'Instagram',
-  'MechanicalKeyboards',
-  'witcher',
-  'teenagers',
-  'europe',
-  'PoliticalCompassMemes',
-  'AskReddit',
-  'pics',
-  'politics',
-  'news',
-  'ksi',
-  'worldnews',
-  'funny',
-  'tifu',
-  'videos',
-  'gaming',
   'aww',
-  'todayilearned',
-  'gifs',
-  'Minecraft',
+  'Music',
   'memes',
-  'Art',
-  'JusticeServed',
   'movies',
-  'XboxSeriesX',
-  'wallstreetbets',
-  'Home',
-  'PublicFreakout',
-  'NoStupidQuestions',
-  'nextfuckinglevel',
-  'leagueoflegends',
-  'interestingasfuck',
-  'relationship_advice',
-  'modernwarfare',
-  'AnimalCrossing',
-  'gtaonline',
-  'WatchPeopleDieInside',
+  'Showerthoughts',
+  'science',
+  'pics',
+  'Jokes',
+  'news',
+  'space',
+  'videos',
+  'DIY',
+  'askscience',
+  'books',
+  'nottheonion',
+  'mildlyinteresting',
+  'food',
+  'EarthPorn',
+  'GetMotivated',
   'explainlikeimfive',
-  'wow',
-  'PS4',
-  'buildapc',
-  'LivestreamFail',
-  'Coronavirus',
-  'unpopularopinion',
-  'jailbreak',
-  'BlackPeopleTwitter',
+  'gadgets',
+  'LifeProTips',
+  'IAmA',
+  'Art',
+  'sports',
+  'gifs',
+  'dataisbeautiful',
+  'Futurology',
+  'Documentaries',
   'personalfinance',
-  'me_irl',
-  'WTF',
-  'iamatotalpieceofshit',
-  'OutOfTheLoop',
-  'legaladvice',
-  'ThatsInsane',
-  'Bad_Cop_No_Donut',
-  'Terraria',
-  'cringepics',
-  'EscapefromTarkov',
-  'AmItheAsshole',
-  'discordapp',
+  'photoshopbattles',
+  'UpliftingNews',
+  'Damnthatsinteresting',
+  'WritingPrompts',
+  'OldSchoolCool',
+  'tifu',
+  'history',
+  'philosophy',
+  'nosleep',
+  'wholesomememes',
+  'listentothis',
+  'technology',
+  'television',
+  'wallstreetbets',
+  'InternetIsBeautiful',
+  'NatureIsFuckingLit',
+  'relationship_advice',
+  'creepy',
+  'nba',
+  'lifehacks',
   'pcmasterrace',
+  'interestingasfuck',
+  'ContagiousLaughter',
+  'travel',
+  'HistoryMemes',
+  'Fitness',
   'anime',
-  'ffxiv',
-  'DotA2',
+  'dadjokes',
+  'oddlysatisfying',
+  'nfl',
+  'Unexpected',
+  'NetflixBestOf',
+  'EatCheapAndHealthy',
   'MadeMeSmile',
-  'Wellthatsucks',
+  'AdviceAnimals',
+  'tattoos',
+  'CryptoCurrency',
+  'mildlyinfuriating',
+  'politics',
+  'ChatGPT',
+  'BeAmazed',
+  'FoodPorn',
+  'AnimalsBeingDerps',
+  'facepalm',
+  'europe',
+  'soccer',
+  'Minecraft',
+  'Parenting',
+  'leagueoflegends',
+  'PS5',
+  'rarepuppers',
+  'WatchPeopleDieInside',
+  'FunnyAnimals',
+  'buildapc',
+  'NintendoSwitch',
+  'cats',
+  'gardening',
+  'Bitcoin',
+  'itookapicture',
+  'cars',
+  'AnimalsBeingBros',
+  'CozyPlaces',
+  'programming',
+  'MakeupAddiction',
+  'HumansBeingBros',
+  'AnimalsBeingJerks',
+  'starterpacks',
+  'Frugal',
+  'malefashionadvice',
+  'socialskills',
+  'apple',
+  'Overwatch',
+  'nevertellmetheodds',
+  'Awwducational',
+  'Tinder',
+  'dating',
+  'coolguides',
+  'woodworking',
+  'entertainment',
+  'nutrition',
+  'CrappyDesign',
+  'foodhacks',
+  'femalefashionadvice',
+  'nasa',
+  'PS4',
+  'drawing',
+  'photography',
+  'technicallythetruth',
+  'YouShouldKnow',
+  'FortNiteBR',
+  'MealPrepSunday',
+  'bestof',
+  'TravelHacks',
+  'ModernWarfareII',
+  'anime_irl',
+  'Sneakers',
+  'NoStupidQuestions',
+  'MapPorn',
+  'backpacking',
+  'boardgames',
+  'pokemongo',
+  'battlestations',
+  'biology',
+  'Economics',
+  'trippinthroughtime',
+  'Outdoors',
+  'Shoestring',
+  'OnePiece',
+  'streetwear',
+  'Survival',
+  'camping',
+  'PremierLeague',
+  'strength_training',
+  'formula1',
+  'funny',
+  'AskReddit',
+  'gaming',
+  'worldnews',
+  'todayilearned',
 ]
 
+let api
 let savestate
-try {
-  savestate = JSON.parse(fs.readFileSync('./db/savestate.json'))
-  savestate.authors = savestate.authors
-    .concat([ // sneak in more authors here on startup
-   ])
-} catch (e) {
-  savestate = {
-    subreddit: subreddits[0],
-    authors: [],
-    plagiarismCases: [],
-  }
-}
-
 async function search () {
+  if (!api) {
+    api = await getApi()
+  }
+  if (!savestate) {
+    savestate = await api.getSavestate()
+  }
   try {
-    const remainder = await run({
-      printTable: true,
-      ...savestate
-    })
+    const remainder = await run(savestate)
     savestate.plagiarismCases = remainder.plagiarismCases
     savestate.authors = remainder.authors
     savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
+    await api.writeSavestate(savestate)
+    await cache.backup()
   } catch (e) {
-    console.error(`something went wrong:`)
     console.error(e)
   }
 }
 
-// investigating weird hangs
-let timeout = 0
 ;(async function () {
-  while (true) {
+  // while (true) {
+    console.log('time: ', (new Date()).toLocaleTimeString())
     const start = Date.now()
-    timeout = setTimeout(() => {
-      console.log('timeout')
-      console.log('savestate: ', savestate)
-      const pendingpromises = pickBy(
-        cache._cache.data,
-        value => Object.prototype.toString.call(value.v) === '[object Promise]'
-      )
-      console.log('pendingpromises', pendingpromises)
-    }, 1000 * 60 * 60)
     await search()
-    clearTimeout(timeout)
-    console.log('Date.now() - start', Date.now() - start)
-  }
+    console.log(`search took ${Date.now() - start}ms`)
+  // }
 })()
 
-;['beforeExit', 'SIGINT', 'SIGUSR1', 'SIGUSR2', 'uncaughtException', 'SIGTERM'].forEach((eventType) => {
-  process.on(eventType, () => {
-    console.log('goodbye')
-    cache.backupToFile()
-    fs.writeFileSync( './db/savestate.json', JSON.stringify(savestate))
-    process.exit()
-  })
-})

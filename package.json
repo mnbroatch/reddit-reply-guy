@@ -9,6 +9,9 @@
   "author": "mnbroatch@gmail.com",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.726.1",
+    "@aws-sdk/client-ssm": "^3.726.1",
+    "aws-sdk": "^2.1692.0",
     "axios": "^0.21.1",
     "dotenv": "^8.2.0",
     "node-cache": "^5.1.2",

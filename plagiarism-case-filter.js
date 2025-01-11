@@ -1,4 +1,4 @@
-const api = require('./api')
+const getApi = require('./get-api')
 const { asyncEvery } = require('./async-array-helpers')
 
 const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
@@ -11,8 +11,8 @@ const criteria = [
   {
     description: 'Is the comment not already reported?',
     test: async ({ copy }) => {
+      const api = await getApi()
       if (await api.hasCommentBeenReported(copy)) {
-        console.log(`ignoring responded-to comment: ${copy.permalink}`)
         return false
       } else {
         return true

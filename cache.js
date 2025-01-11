@@ -13,10 +13,12 @@ class Cache {
     this.set = this._cache.set.bind(this._cache)
     this.get = this._cache.get.bind(this._cache)
 
-    try {
-      this._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
-    } catch (e) {
-      console.error(e)
+    if (process.env.IS_LOCAL) {
+      try {
+        this._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
+      } catch (e) {
+        console.error(e)
+      }
     }
   }
 
@@ -52,12 +54,14 @@ class Cache {
     }).bind(this)
   }
 
-  backupToFile () {
-    const cacheToSave = pickBy(
-      cache._cache.data,
-      value => Object.prototype.toString.call(value.v) !== '[object Promise]'
-    )
-    fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))
+  backup () {
+    if (process.env.IS_LOCAL) {
+      const cacheToSave = pickBy(
+        cache._cache.data,
+        value => Object.prototype.toString.call(value.v) !== '[object Promise]'
+      )
+      fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))
+    }
   }
 }
 

@@ -16,12 +16,8 @@ module.exports = function findPlagiarismCases (posts) {
     .map(posts => posts.map(post => post.comments).flat())
     .filter(postComments => postComments.length > 1)
 
-  console.log(`searching ${commentsPerPostWithDupes.length} posts`)
-  console.log('posts.length', posts.length)
-
   const maybePlagiarismCases = commentsPerPostWithDupes.map((comments) => {
     const post = posts.find(p => p.id === comments[0]?.link_id)
-    console.log(`looking for plagiarism in post: ${comments[0]?.link_id} (${comments.length} comments)`)
     const commentsByBody = groupCommentsBySimilarBody(comments)
 
     // If there are more matches than that, could be memery.

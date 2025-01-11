@@ -1,6 +1,6 @@
 require('dotenv').config()
-const fs = require('fs')
-const api = require('./api')
+const getApi = require('./get-api')
+const getEnv = require('./get-env')
 const Data = require('./data')
 const uniqBy = require('lodash/uniqBy')
 const groupBy = require('lodash/groupBy')
@@ -18,11 +18,6 @@ const {
   asyncMapSerial,
   asyncFilter,
 } = require('./async-array-helpers')
-
-const MIN_PLAGIARIST_CASES_FOR_COMMENT = +process.env.MIN_PLAGIARIST_CASES_FOR_COMMENT
-const MIN_PLAGIARIST_CASES_FOR_REPORT = +process.env.MIN_PLAGIARIST_CASES_FOR_REPORT
-const MAX_COMMENT_AGE = +process.env.MAX_COMMENT_AGE 
-const MAX_REMAINDER_AUTHORS = +process.env.MAX_REMAINDER_AUTHORS
 
 const subsThatDemandOneReportPerAuthor = [
   'funny',
@@ -78,9 +73,10 @@ const whitelistedTitles = [
   'loser leaves reddit',
 ]
 
+const DRY_RUN = false
+const PRINT_TABLE = false
+
 async function run ({
-  dryRun,
-  printTable,
   author,
   authors = author ? [ author ] : [],
   subreddit,
@@ -89,7 +85,13 @@ async function run ({
   postIds = postId ? [ postId ] : [],
   initialPlagiarismCases = []
 }) {
-  console.log('time: ', (new Date()).toLocaleTimeString())
+  const env = await getEnv()
+  const api = await getApi()
+  const MIN_PLAGIARIST_CASES_FOR_COMMENT = +env.MIN_PLAGIARIST_CASES_FOR_COMMENT
+  const MIN_PLAGIARIST_CASES_FOR_REPORT = +env.MIN_PLAGIARIST_CASES_FOR_REPORT
+  const MAX_COMMENT_AGE = +env.MAX_COMMENT_AGE 
+  const MAX_REMAINDER_AUTHORS = +env.MAX_REMAINDER_AUTHORS
+
   const data = new Data()
 
   authors.length && console.log(`searching authors: ${authors}`)
@@ -114,9 +116,6 @@ async function run ({
       // ignore inactive authors
       authorComments.sort((a, b) => b.created - a.created)
       const isActive = authorComments[0].created * 1000 > Date.now() - MAX_COMMENT_AGE
-      if (!isActive) {
-        console.log(`ignoring inactive author: ${authorComments[0].author.name}`)
-      }
       return isActive
     })
 
@@ -172,7 +171,7 @@ async function run ({
       additional: authorPlagiarismCases.filter(pc => pc!== plagiarismCase)
     })))
     
-  if (printTable) {
+  if (PRINT_TABLE) {
     plagiarismCasesPerAuthor.forEach((authorPlagiarismCases) => {
       if (authorPlagiarismCases.length) {
         console.log('----------------------------------')
@@ -186,7 +185,7 @@ async function run ({
     plagiarismCasesPerAuthor
       .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT),
     async (authorPlagiarismCases) => {
-      if (dryRun) return
+      if (DRY_RUN) return
 
       let reply // will be overwritten each case, but we only need one per author
       let comment
@@ -199,6 +198,8 @@ async function run ({
           ) return // this is why we use asyncMapSerial here
 
           await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
+
+          console.log('plagiarismCase', plagiarismCase)
 
           if (shouldReply(plagiarismCase)) {
             reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
@@ -225,7 +226,7 @@ async function run ({
     }
   )
 
-  if (!dryRun) {
+  if (!DRY_RUN) {
     await asyncMap(
       authors,
       author => api.setAuthorLastSearched(

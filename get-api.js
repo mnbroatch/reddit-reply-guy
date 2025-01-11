@@ -1,3 +1,10 @@
+const {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} = require("@aws-sdk/client-s3");
+const fs = require('fs')
+const getEnv = require('./get-env')
 const axios = require('axios')
 const JSONdb = require('simple-json-db');
 const uniqBy = require('lodash/uniqBy')
@@ -10,35 +17,28 @@ const { asyncMap } = require('./async-array-helpers')
 const authorsDb = new JSONdb('db/authors.json')
 const commentsDb = new JSONdb('db/comments.json')
 
-// var http = require('http-debug').http
-// var https = require('http-debug').https
-// http.debug = 1
-// https.debug = 1
-
-const INITIAL_POST_LIMIT = +process.env.INITIAL_POST_LIMIT 
-const AUTHOR_POST_LIMIT = +process.env.AUTHOR_POST_LIMIT
-
-const {
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDDIT_USER,
-  REDDIT_PASS,
-  USER_AGENT,
-} = process.env
-const snoowrap = new Snoowrap({
-  userAgent: USER_AGENT,
-  clientId: CLIENT_ID,
-  clientSecret: CLIENT_SECRET,
-  username: REDDIT_USER,
-  password: REDDIT_PASS
-})
-snoowrap.config({
-  continueAfterRatelimitError: true,
-  requestDelay: 1000,
-  // debug: true,
-})
-
 class Api {
+  async initialize () {
+    this.env = await getEnv()
+    this.env.INITIAL_POST_LIMIT = +this.env.INITIAL_POST_LIMIT 
+    this.env.AUTHOR_POST_LIMIT = +this.env.AUTHOR_POST_LIMIT
+
+    this.snoowrap = new Snoowrap({
+      userAgent: this.env.USER_AGENT,
+      clientId: this.env.CLIENT_ID,
+      clientSecret: this.env.CLIENT_SECRET,
+      username: this.env.REDDIT_USER,
+      password: this.env.REDDIT_PASS
+    })
+    this.snoowrap.config({
+      continueAfterRatelimitError: true,
+      requestDelay: 1000,
+      // debug: true,
+    })
+
+    this.s3Client = new S3Client({region: 'us-east-1',});
+  }
+
   constructor() {
     ;[
       'getPost',
@@ -53,7 +53,7 @@ class Api {
   }
 
   async getComment (id) {
-    const comment = snoowrap.getComment(id)
+    const comment = this.snoowrap.getComment(id)
 
     return {
       id: await comment.id,
@@ -71,7 +71,7 @@ class Api {
 
   async getPost (postId) {
     try {
-      const post = await snoowrap.getSubmission(postId)
+      const post = await this.snoowrap.getSubmission(postId)
       const unwrappedPost = {
         id: await post.id,
         comments: await post.comments,
@@ -81,7 +81,6 @@ class Api {
         title: await post.title,
         selftext: await post.selftext,
       }
-      console.log(`retrieved post: ${postId}`)
       return new Post(unwrappedPost)
     } catch (e) {
       return null
@@ -90,24 +89,22 @@ class Api {
 
   async getSubredditPosts (subreddit) {
     try {
-      console.log(`getting posts from subreddit: ${subreddit}`)
+      console.log('this.env.INITIAL_POST_LIMIT ', this.env.INITIAL_POST_LIMIT )
       return asyncMap(
-        await snoowrap.getHot(subreddit, { limit: INITIAL_POST_LIMIT }),
+        await this.snoowrap.getHot(subreddit, { limit: this.env.INITIAL_POST_LIMIT }),
         post => this.getPost(post.id)
       )
     } catch (e) {
-      console.log('e1', e)
+      console.error(e)
       return []
     }
   }
 
   async getAuthorComments (author) {
     try {
-      console.log(`getting comments from author: ${author}`)
-      return await snoowrap.getUser(author).getComments({ limit: AUTHOR_POST_LIMIT })
+      return await this.snoowrap.getUser(author).getComments({ limit: this.env.AUTHOR_POST_LIMIT })
         .map(stripComment)
     } catch (e) {
-      console.log(`couldn't get comments by: ${author}`)
       return []
     }
   }
@@ -119,16 +116,16 @@ class Api {
 
     try {
       duplicatePostIdsFromReddit = await asyncMap(
-        await snoowrap.getSubmission(post.id).getDuplicates().comments,
+        await this.snoowrap.getSubmission(post.id).getDuplicates().comments,
         dupeMeta => dupeMeta.id
       )
     } catch (e) {
-      console.log('e', e)
+      console.error(e)
     }
 
     try {
       duplicatePostIdsFromUrlSearch = await asyncMap(
-        await snoowrap.oauthRequest({
+        await this.snoowrap.oauthRequest({
           uri: '/api/info',
           method: 'get',
           qs: {
@@ -138,7 +135,7 @@ class Api {
         dupeMeta => dupeMeta.id
       )
     } catch (e) {
-      console.log('e', e)
+      console.error(e)
     }
 
     if (canTryImageSearch(post)) {
@@ -181,7 +178,7 @@ class Api {
   async reportAuthor (author, message) {
     console.log(`reporting author (I think): ${author}`)
     try {
-      await snoowrap.oauthRequest({
+      await this.snoowrap.oauthRequest({
         uri: '/api/report_user',
         method: 'post',
         qs: {
@@ -196,7 +193,7 @@ class Api {
         reported: Date.now()
       })
     } catch (e) {
-      console.log('e', e)
+      console.error(e)
     }
   }
 
@@ -205,7 +202,7 @@ class Api {
     try {
       await ({
         ...comment,
-        _r: snoowrap,
+        _r: this.snoowrap,
         _post: Snoowrap.objects.ReplyableContent.prototype._post,
         report: Snoowrap.objects.ReplyableContent.prototype.report,
       })
@@ -229,11 +226,11 @@ class Api {
   }
 
   async replyToComment (comment, message) {
-    console.log(`replying to comment: ${comment.id}`)
+    console.log(`replying to comment: ${comment.id} in ${comment.subreddit?.display_name }`)
     try {
       return ({
         ...comment,
-        _r: snoowrap,
+        _r: this.snoowrap,
         _post: Snoowrap.objects.ReplyableContent.prototype._post,
         reply: Snoowrap.objects.ReplyableContent.prototype.reply,
       }) 
@@ -246,7 +243,7 @@ class Api {
   async sendModmail (subreddit, subject, text) {
     try {
     console.log(`sending modmail to r/${subreddit}`)
-    await snoowrap.composeMessage({
+    await this.snoowrap.composeMessage({
       to: `r/${subreddit}`,
       subject,
       text,
@@ -280,6 +277,49 @@ class Api {
   async hasAuthorBeenReported (author) {
     return !!(await authorsDb.get(author))?.reported
   }
+
+  async getSavestate () {
+    if (this.env.IS_LOCAL) {
+      try {
+        return JSON.parse(fs.readFileSync('./db/savestate.json'))
+        // savestate.authors = savestate.authors
+        //   .concat([ // sneak in more authors here on startup
+        //  ])
+      } catch (e) {
+        return {
+          subreddit: subreddits[0],
+          authors: [],
+          plagiarismCases: [],
+        }
+      }
+    } else {
+      const response = await this.s3Client.send(
+        new GetObjectCommand({
+          Bucket: 'redditreplyguy',
+          Key: 'savestate',
+        }),
+      );
+      return await response.Body.transformToString();
+    }
+  }
+
+  writeSavestate (savestate) {
+    if (this.env.IS_LOCAL) {
+      fs.writeFileSync( './db/savestate.json', JSON.stringify(savestate))
+    } else {
+      const command = new PutObjectCommand({
+        Bucket: 'redditreplyguy',
+        Key: 'savestate',
+        Body: JSON.stringify({
+             subreddit: subreddits[0],
+             authors: [],
+             plagiarismCases: [],
+        }),
+      });
+
+      return this.s3Client.send(command);
+    }
+  }
 }
 
 function canTryImageSearch(post) {
@@ -288,6 +328,13 @@ function canTryImageSearch(post) {
     && !post.removed_by_category
 }
 
-const api = new Api()
+let api
+async function getApi () {
+  if (!api) {
+    api = new Api()
+    await api.initialize()
+  }
+  return api
+}
 
-module.exports = api
+module.exports = getApi
