@@ -44,12 +44,6 @@ module.exports = function findPlagiarismCases (posts) {
     'author.name'
   )
 
-  // TODO: test this
-  const oneSubComments = Object.values(commentsByPlagiarist).filter((comments, i) => comments.every(comment => Object.values(commentsByPlagiarist)[i]))
-  if (oneSubComments && oneSubComments.length) {
-    console.log('oneSubComments', oneSubComments)
-  }
-
   const repetitiveComments = Object.values(commentsByPlagiarist)
     .map((plagiaristComments) => Object.values(groupCommentsBySimilarBody(plagiaristComments, .7))
       .filter(similarComments => similarComments.length > 1)

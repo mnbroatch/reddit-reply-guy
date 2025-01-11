@@ -90,14 +90,12 @@ class Api {
   }
 
   async getSubredditPosts (subreddit) {
-    console.log('subreddit', subreddit)
     try {
       return asyncMap(
         await this.snoowrap.getHot(subreddit, { limit: this.env.INITIAL_POST_LIMIT }),
         post => this.getPost(post.id)
       )
     } catch (e) {
-      console.log('123123', 123123)
       console.error(e)
       return []
     }
@@ -224,7 +222,7 @@ class Api {
         reportedInSubs: uniqBy([ ...reportedInSubs, comment.subreddit.display_name ]),
       })
     } catch (e) {
-      console.log('e', e)
+      console.error(e)
     }
   }
 
@@ -239,7 +237,7 @@ class Api {
       }) 
         .reply(message)
     } catch (e) {
-      console.log('e', e)
+      console.error(e)
     }
   }
 
@@ -252,7 +250,7 @@ class Api {
       text,
     })
     } catch(e) {
-      console.log('e', e)
+      console.error(e)
     }
   }
 
