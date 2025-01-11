@@ -23,13 +23,15 @@ class Api {
     this.env.INITIAL_POST_LIMIT = +this.env.INITIAL_POST_LIMIT 
     this.env.AUTHOR_POST_LIMIT = +this.env.AUTHOR_POST_LIMIT
 
-    this.snoowrap = new Snoowrap({
+    const snoowrapOptions = {
       userAgent: this.env.USER_AGENT,
       clientId: this.env.CLIENT_ID,
       clientSecret: this.env.CLIENT_SECRET,
       username: this.env.REDDIT_USER,
       password: this.env.REDDIT_PASS
-    })
+    }
+
+    this.snoowrap = new Snoowrap(snoowrapOptions)
     this.snoowrap.config({
       continueAfterRatelimitError: true,
       requestDelay: 1000,
@@ -88,13 +90,14 @@ class Api {
   }
 
   async getSubredditPosts (subreddit) {
+    console.log('subreddit', subreddit)
     try {
-      console.log('this.env.INITIAL_POST_LIMIT ', this.env.INITIAL_POST_LIMIT )
       return asyncMap(
         await this.snoowrap.getHot(subreddit, { limit: this.env.INITIAL_POST_LIMIT }),
         post => this.getPost(post.id)
       )
     } catch (e) {
+      console.log('123123', 123123)
       console.error(e)
       return []
     }
