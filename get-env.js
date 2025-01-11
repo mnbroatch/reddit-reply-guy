@@ -6,7 +6,7 @@ let env
 async function getEnv () {
   if (env) return env
   if (process.env.REDDIT_USER) { // from .env file
-    env = process.env
+    env = {...process.env}
   } else {
     const ssmClient = new SSMClient({ region: "us-east-1" });
 
