@@ -281,27 +281,27 @@ class Api {
   }
 
   async getSavestate () {
-    if (this.env.IS_LOCAL) {
-      try {
-        return JSON.parse(fs.readFileSync('./db/savestate.json'))
-        // savestate.authors = savestate.authors
-        //   .concat([ // sneak in more authors here on startup
-        //  ])
-      } catch (e) {
-        return {
-          subreddit: subreddits[0],
-          authors: [],
-          plagiarismCases: [],
-        }
+    try {
+      if (this.env.IS_LOCAL) {
+          return JSON.parse(fs.readFileSync('./db/savestate.json'))
+          // savestate.authors = savestate.authors
+          //   .concat([ // sneak in more authors here on startup
+          //  ])
+      } else {
+        const response = await this.s3Client.send(
+          new GetObjectCommand({
+            Bucket: 'redditreplyguy',
+            Key: 'savestate',
+          }),
+        );
+        return JSON.parse(await response.Body.transformToString());
       }
-    } else {
-      const response = await this.s3Client.send(
-        new GetObjectCommand({
-          Bucket: 'redditreplyguy',
-          Key: 'savestate',
-        }),
-      );
-      return JSON.parse(await response.Body.transformToString());
+    } catch (e) {
+      return {
+        subreddit: subreddits[0],
+        authors: [],
+        plagiarismCases: [],
+      }
     }
   }
 
