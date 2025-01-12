@@ -53,4 +53,3 @@ module.exports = function findPlagiarismCases (posts) {
     .filter(plagiarismCase => !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id)))
 }
 
-

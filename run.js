@@ -80,7 +80,7 @@ const whitelistedTitles = [
 ]
 
 const DRY_RUN = false
-const PRINT_TABLE = false
+const PRINT_TABLE = true
 
 async function run ({
   author,
@@ -184,7 +184,10 @@ async function run ({
 
   await asyncMap(
     plagiarismCasesPerAuthor
-      .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT),
+      .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT)
+      .filter(authorPlagiarismCases => {
+        return authorPlagiarismCases.some(plagiarismCase => plagiarismCase.copy.subreddit.display_name !== authorPlagiarismCases[0].copy.subreddit.display_name)
+      }),
     async (authorPlagiarismCases) => {
       if (DRY_RUN) return
 

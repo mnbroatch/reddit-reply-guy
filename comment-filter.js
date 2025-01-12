@@ -18,6 +18,8 @@ const authorWhitelist = [
 
 // generally subs with a lot of memes or rigid formats
 const subredditWhitelist = [
+
+  'musicsuggestions',
   '196',
   'National_Pet_Adoption',
   'rescuedogs',
