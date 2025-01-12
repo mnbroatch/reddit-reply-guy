@@ -186,6 +186,7 @@ async function run ({
     plagiarismCasesPerAuthor
       .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT)
       .filter(authorPlagiarismCases => {
+        // in case I miss a sub that should be whitelisted
         return authorPlagiarismCases.some(plagiarismCase => plagiarismCase.copy.subreddit.display_name !== authorPlagiarismCases[0].copy.subreddit.display_name)
       }),
     async (authorPlagiarismCases) => {
