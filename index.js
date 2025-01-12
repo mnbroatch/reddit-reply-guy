@@ -1,4 +1,4 @@
-const cache = require('./cache')
+const getCache = require('./get-cache')
 const run = require('./run')
 const getApi = require('./get-api')
 const subreddits = require('./subreddits')
@@ -8,6 +8,7 @@ const DRY_RUN = false
 let api
 let savestate
 async function search () {
+  const cache = await getCache()
   if (!api) {
     api = await getApi()
   }
@@ -20,6 +21,7 @@ async function search () {
     savestate.authors = remainder.authors
     savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
     await api.writeSavestate(savestate)
+    await api.backupDb()
     await cache.backup()
   } catch (e) {
     console.error(e)

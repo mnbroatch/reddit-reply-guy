@@ -18,6 +18,12 @@ const {
   asyncMapSerial,
   asyncFilter,
 } = require('./async-array-helpers')
+const {
+  MIN_PLAGIARIST_CASES_FOR_COMMENT,
+  MIN_PLAGIARIST_CASES_FOR_REPORT,
+  MAX_COMMENT_AGE,
+  MAX_REMAINDER_AUTHORS,
+} = require('./constants')
 
 const subsThatDemandOneReportPerAuthor = [
   'funny',
@@ -87,11 +93,6 @@ async function run ({
 }) {
   const env = await getEnv()
   const api = await getApi()
-  const MIN_PLAGIARIST_CASES_FOR_COMMENT = +env.MIN_PLAGIARIST_CASES_FOR_COMMENT
-  const MIN_PLAGIARIST_CASES_FOR_REPORT = +env.MIN_PLAGIARIST_CASES_FOR_REPORT
-  const MAX_COMMENT_AGE = +env.MAX_COMMENT_AGE 
-  const MAX_REMAINDER_AUTHORS = +env.MAX_REMAINDER_AUTHORS
-
   const data = new Data()
 
   authors.length && console.log(`searching authors: ${authors}`)

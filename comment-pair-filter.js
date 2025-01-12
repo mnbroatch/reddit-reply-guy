@@ -1,8 +1,7 @@
 const uniqBy = require('lodash/uniqBy')
 const isSimilar = require('./is-similar')
 const groupCommentsBySimilarBody = require('./group-comments-by-similar-body')
-
-const SIMILARITY_THRESHOLD_LOOSE = .6
+const {SIMILARITY_THRESHOLD_LOOSE} = require('./constants')
 
 const criteria = [
   {

@@ -1,7 +1,7 @@
 const fs = require('fs')
 const crypto = require('crypto')
 const NodeCache = require('node-cache')
-const pickBy = require('lodash/pickBy')
+const s3Client = require('./s3-client')
 
 class Cache {
   constructor() {
@@ -12,13 +12,22 @@ class Cache {
 
     this.set = this._cache.set.bind(this._cache)
     this.get = this._cache.get.bind(this._cache)
+  }
 
-    if (process.env.IS_LOCAL) {
-      try {
+  async initialize () {
+    try {
+      if (process.env.IS_LOCAL) {
         this._cache.data = JSON.parse(fs.readFileSync('./db/cache-backup.json'))
-      } catch (e) {
-        console.error(e)
+      } else {
+        const response = await s3Client.send(
+          new GetObjectCommand({
+            Bucket: 'redditreplyguy',
+            Key: 'cachebackup',
+          }),
+        );
+        this._cache.data = JSON.parse(await response.Body.transformToString());
       }
+    } catch (e) {
     }
   }
 
@@ -55,16 +64,30 @@ class Cache {
   }
 
   backup () {
+    const cacheToSave = pickBy(
+      cache._cache.data,
+      value => Object.prototype.toString.call(value.v) !== '[object Promise]'
+    )
     if (process.env.IS_LOCAL) {
-      const cacheToSave = pickBy(
-        cache._cache.data,
-        value => Object.prototype.toString.call(value.v) !== '[object Promise]'
-      )
       fs.writeFileSync('./db/cache-backup.json', JSON.stringify(cacheToSave))
+    } else {
+      const command = new PutObjectCommand({
+        Bucket: 'redditreplyguy',
+        Key: 'cachebackup',
+        Body: JSON.stringify(cacheToSave),
+      });
+      return s3Client.send(command);
     }
   }
 }
 
-const cache = new Cache()
+let cache
+async function getCache () {
+  if (!cache) {
+    cache = new Cache()
+    await cache.initialize()
+  }
+  return cache
+}
 
-module.exports = cache
+module.exports = getCache

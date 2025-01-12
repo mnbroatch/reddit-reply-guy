@@ -1,6 +1,5 @@
 const stripQuotes = require('./strip-quotes')
-
-const MIN_COMMENT_LENGTH = 20
+const {MIN_COMMENT_LENGTH} = require('./constants')
 
 const authorWhitelist = [
   'worldmobilemod',
@@ -20,10 +19,14 @@ const authorWhitelist = [
 // generally subs with a lot of memes or rigid formats
 const subredditWhitelist = [
   '196',
+  'National_Pet_Adoption',
+  'rescuedogs',
+  'AdoptableDogsTexas',
   'lebowski',
   'HIMYM',
   'howimetyourmother',
   'PrettyLittleLiars',
+  'arresteddevelopment',
   'AmITheDevil',
   'AskOuija',
   'CelebAssPussyMouth',
