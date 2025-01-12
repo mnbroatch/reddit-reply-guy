@@ -345,21 +345,27 @@ class Api {
 
   async backupDb (savestate) {
     if (!process.env.IS_LOCAL) {
-      const authorsDbString = fs.readFileSync('./db/authors.json')
-      const authorsDbCommand = new PutObjectCommand({
-        Bucket: 'redditreplyguy',
-        Key: 'authors',
-        Body: authorsDbString,
-      });
-      await s3Client.send(authorsDbCommand);
+      try {
+        const authorsDbString = fs.readFileSync('./db/authors.json')
+        const authorsDbCommand = new PutObjectCommand({
+          Bucket: 'redditreplyguy',
+          Key: 'authors',
+          Body: authorsDbString,
+        });
+        await s3Client.send(authorsDbCommand);
+      } catch {
+      }
 
-      const commentsDbString = fs.readFileSync('./db/comments.json')
-      const commentsDbCommand = new PutObjectCommand({
-        Bucket: 'redditreplyguy',
-        Key: 'comments',
-        Body: commentsDbString,
-      });
-      await s3Client.send(commentsDbCommand);
+      try {
+        const commentsDbString = fs.readFileSync('./db/comments.json')
+        const commentsDbCommand = new PutObjectCommand({
+          Bucket: 'redditreplyguy',
+          Key: 'comments',
+          Body: commentsDbString,
+        });
+        await s3Client.send(commentsDbCommand);
+      } catch {
+      }
     }
   }
 }
