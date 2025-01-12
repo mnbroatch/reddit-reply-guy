@@ -82,6 +82,10 @@ const criteria = [
     test: (comment) => !authorWhitelist.includes(comment.author.name),
   },
   {
+    description: 'Is body not a gif?',
+    test: (comment) => !(/^!\[gif]\(.*\)$/.test(comment.body)),
+  },
+  {
     description: 'Is body not primarily a reddit shorthand link?',
     test: (comment) => {
       // TODO: fix this; why first word?
