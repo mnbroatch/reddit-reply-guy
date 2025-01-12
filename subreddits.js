@@ -148,5 +148,7 @@ module.exports = [
   'PremierLeague',
   'strength_training',
   'formula1',
+  'introvertmemes',
+  'SnapshotHistory',
 ]
 
