@@ -1,3 +1,6 @@
+const {
+  PutObjectCommand,
+} = require("@aws-sdk/client-s3");
 const fs = require('fs')
 const pickBy = require('lodash/pickBy')
 const crypto = require('crypto')
