@@ -259,7 +259,7 @@ async function run ({
       .sort((a, b) => 
         (a.lastSearched || 0) - (b.lastSearched || 0)
           || b.plagiarismCasesCount - a.plagiarismCasesCount
-          || b.latestCommentCreated - b.latestCommentCreated
+          || b.latestCommentCreated - a.latestCommentCreated
       )
       .map(plagiarismCase => plagiarismCase.author)
   ).slice(0, MAX_REMAINDER_AUTHORS)
