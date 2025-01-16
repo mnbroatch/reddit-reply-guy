@@ -7,17 +7,17 @@ function createReportText(plagiarismCase) {
   return `bot - copies reddit.com/comments/${plagiarismCase.original.link_id}/foo/${plagiarismCase.original.id}`
 }
 
-function createModmailText (plagiarismCase) {
+function createModmailText (plagiarismCase, authorPlagiarismCases) {
   return `Plagiarized comment found: ${plagiarismCase.copy.permalink}
 
 Original: ${plagiarismCase.original.permalink}
 
 Additional evidence against /u/${plagiarismCase.author}:
 
-${createTable(plagiarismCase.additional)}`
+${createTable(authorPlagiarismCases.filter(pc => pc!== plagiarismCase))}`
 }
 
-function createReplyText (plagiarismCase) {
+function createReplyText (plagiarismCase, authorPlagiarismCases) {
   const subreddit = plagiarismCase.copy.subreddit.display_name
   const noUsernameLinks = subredditsThatDisallowUsernameLinks
     .find(sub => sub.toLowerCase() === subreddit.toLowerCase())
@@ -34,7 +34,7 @@ function createReplyText (plagiarismCase) {
 
 It is probably not a coincidence; here is some more evidence against this user:
 
-${createTable(plagiarismCase.additional)}
+${createTable(authorPlagiarismCases.filter(pc => pc!== plagiarismCase))}
 
 beep boop, I'm a bot -|:] It is this bot's opinion that ${user} should be banned for karma manipulation. Don't feel bad, they are probably a bot too.
 

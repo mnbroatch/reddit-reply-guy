@@ -6,6 +6,7 @@ const groupBy = require('lodash/groupBy')
 const findPlagiarismCases = require('./find-plagiarism-cases')
 const commentFilter = require('./comment-filter')
 const plagiarismCaseFilter = require('./plagiarism-case-filter')
+const authorPlagiarismCasesFilter = require('./author-plagiarism-cases-filter')
 const {
   createReplyText,
   createReportText,
@@ -18,7 +19,6 @@ const {
   asyncFilter,
 } = require('./async-array-helpers')
 const {
-  MIN_PLAGIARIST_CASES_FOR_COMMENT,
   MIN_PLAGIARIST_CASES_FOR_REPORT,
   MAX_COMMENT_AGE,
   MAX_REMAINDER_AUTHORS,
@@ -79,8 +79,7 @@ const whitelistedTitles = [
   'favorite',
 ]
 
-const DRY_RUN = false
-const PRINT_TABLE = true
+const DRY_RUN = true
 
 async function run ({
   subreddit,
@@ -88,6 +87,9 @@ async function run ({
 }) {
   const api = await getApi()
   const data = new Data()
+
+  console.log('initialPlagiarismCases', initialPlagiarismCases)
+  const authors = initialPlagiarismCases.map(plagiarismCase => plagiarismCase.author)
 
   ;(await asyncMap([subreddit], api.getSubredditPosts))
     .flat()
@@ -98,10 +100,8 @@ async function run ({
   const commentsPerAuthor = (await asyncMap(uniqBy(authors), api.getAuthorComments))
     .map(authorComments => authorComments.filter(commentFilter))
     .filter((authorComments) => {
-      if (!authorComments.length) return false
-      // ignore inactive authors
       authorComments.sort((a, b) => b.created - a.created)
-      const isActive = authorComments[0].created * 1000 > Date.now() - MAX_COMMENT_AGE
+      const isActive = authorComments.length && authorComments[0].created * 1000 > Date.now() - MAX_COMMENT_AGE
       return isActive
     })
 
@@ -148,73 +148,52 @@ async function run ({
     }
   )
 
-  const plagiarismCases = uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id')
+  const plagiarismCases = await asyncFilter(uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
   const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)
-    .map(authorPlagiarismCases => authorPlagiarismCases.map(plagiarismCase => ({
-      ...plagiarismCase,
-      additional: authorPlagiarismCases.filter(pc => pc!== plagiarismCase)
-    })))
     
-  if (PRINT_TABLE) {
-    plagiarismCasesPerAuthor.forEach((authorPlagiarismCases) => {
-      if (authorPlagiarismCases.length) {
-        console.log('----------------------------------')
-        console.log(authorPlagiarismCases[0].author)
-        console.log(createTable(authorPlagiarismCases))
-      }
-    })
-  }
-
-  await asyncMap(
-    plagiarismCasesPerAuthor
-      .filter(authorPlagiarismCases => authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT)
-      .filter(authorPlagiarismCases => {
-        // in case I miss a sub that should be whitelisted
-        return authorPlagiarismCases.some(plagiarismCase => plagiarismCase.copy.subreddit.display_name !== authorPlagiarismCases[0].copy.subreddit.display_name)
-      }),
-    async (authorPlagiarismCases) => {
-      if (DRY_RUN) return
-
-      let reply // will be overwritten each case, but we only need one per author
-      let comment
-      await asyncMapSerial(
-        await asyncFilter(authorPlagiarismCases, plagiarismCaseFilter),
-        async (plagiarismCase) => {
-          if (
-            subsThatDemandOneReportPerAuthor.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())
-            && api.getAuthorReportedSubs(plagiarismCase.author).includes(plagiarismCase.copy.subreddit.display_name)
-          ) return // this is why we use asyncMapSerial here
-
-          await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
-
-          if (shouldReply(plagiarismCase)) {
-            reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase))
-            comment = plagiarismCase.copy
-          }
-
-          if (subsThatRequestModmail.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())) {
-            await api.sendModmail(
-              plagiarismCase.copy.subreddit.display_name,
-              `reply-guy-bot found a match: ${plagiarismCase.copy.id}`,
-              createModmailText(plagiarismCase)
-            )
-          }
-        }
-      )
-
-      if (
-        reply
-        && authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_REPORT
-        && !await api.hasAuthorBeenReported(comment.author.name)
-      ) {
-        await api.reportAuthor(comment.author.name, `http://reddit.com/comments/${comment.link_id}/-|:]/${reply.id}`)
-      }
-    }
-  )
-
   if (!DRY_RUN) {
+    await asyncMap(
+      plagiarismCasesPerAuthor.filter(authorPlagiarismCasesFilter),
+      async (authorPlagiarismCases) => {
+        let reply // will be overwritten each case, but we only need one per author
+        let comment
+        await asyncMapSerial(
+          authorPlagiarismCases,
+          async (plagiarismCase) => {
+            if (
+              subsThatDemandOneReportPerAuthor.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())
+              && api.getAuthorReportedSubs(plagiarismCase.author).includes(plagiarismCase.copy.subreddit.display_name)
+            ) return // this is why we use asyncMapSerial here
+
+            await api.reportComment(plagiarismCase.copy, createReportText(plagiarismCase))
+
+            if (shouldReply(plagiarismCase)) {
+              reply = await api.replyToComment(plagiarismCase.copy, createReplyText(plagiarismCase, authorPlagiarismCases))
+              comment = plagiarismCase.copy
+            }
+
+            if (subsThatRequestModmail.some(sub => plagiarismCase.copy.subreddit.display_name.toLowerCase() === sub.toLowerCase())) {
+              await api.sendModmail(
+                plagiarismCase.copy.subreddit.display_name,
+                `reply-guy-bot found a match: ${plagiarismCase.copy.id}`,
+                createModmailText(plagiarismCase, authorPlagiarismCases)
+              )
+            }
+          }
+        )
+
+        if (
+          reply
+          && authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_REPORT
+          && !await api.hasAuthorBeenReported(comment.author.name)
+        ) {
+          await api.reportAuthor(comment.author.name, `http://reddit.com/comments/${comment.link_id}/-|:]/${reply.id}`)
+        }
+      }
+    )
+
     await asyncMap(
       authors,
       author => api.setAuthorLastSearched(
@@ -224,13 +203,10 @@ async function run ({
     )
   }
 
-  // Carry over some of the cases whose authors we haven't investigated fully.
-  // Only carry over least recently searched authors and cases.
-  const remainderPlagiarismCasesPerAuthor = plagiarismCasesPerAuthor
-    .filter(authorPlagiarismCases => !authors.includes(authorPlagiarismCases[0].author))
+  console.log('plagiarismCasesPerAuthor', plagiarismCasesPerAuthor)
 
   const remainderAuthorsLastSearched = await asyncMap(
-    remainderPlagiarismCasesPerAuthor,
+    plagiarismCasesPerAuthor,
     async authorPlagiarismCases => ({
       author: authorPlagiarismCases[0].author,
       lastSearched: await api.getAuthorLastSearched(authorPlagiarismCases[0].author),
@@ -248,6 +224,7 @@ async function run ({
       )
       .map(plagiarismCase => plagiarismCase.author)
   ).slice(0, MAX_REMAINDER_AUTHORS)
+
 
   const plagiarismCasesToReturn = authorsToReturn.map(author => plagiarismCasesByAuthor[author]).flat()
 
