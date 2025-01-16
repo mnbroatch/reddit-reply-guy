@@ -3,22 +3,13 @@ const run = require('./run')
 const getApi = require('./get-api')
 const subreddits = require('./subreddits')
 
-const DRY_RUN = false
-
-let api
-let savestate
 async function search () {
   const cache = await getCache()
-  if (!api) {
-    api = await getApi()
-  }
-  if (!savestate) {
-    savestate = await api.getSavestate()
-  }
+  const api = await getApi()
+  const savestate = await api.getSavestate()
   try {
     const remainder = await run(savestate)
     savestate.plagiarismCases = remainder.plagiarismCases
-    savestate.authors = remainder.authors
     savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
     await api.writeSavestate(savestate)
     await api.backupDb()

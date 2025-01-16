@@ -1,6 +1,5 @@
 require('dotenv').config()
 const getApi = require('./get-api')
-const getEnv = require('./get-env')
 const Data = require('./data')
 const uniqBy = require('lodash/uniqBy')
 const groupBy = require('lodash/groupBy')
@@ -84,28 +83,13 @@ const DRY_RUN = false
 const PRINT_TABLE = true
 
 async function run ({
-  author,
-  authors = author ? [ author ] : [],
   subreddit,
-  subreddits = subreddit ? [ subreddit ] : [],
-  postId,
-  postIds = postId ? [ postId ] : [],
   initialPlagiarismCases = []
 }) {
-  const env = await getEnv()
   const api = await getApi()
   const data = new Data()
 
-  authors.length && console.log(`searching authors: ${authors}`)
-  subreddits.length && console.log(`searching subreddits: ${subreddits}`)
-  postIds.length && console.log(`searching postIds: ${postIds}`)
-
-  ;(await asyncMap(postIds, api.getPost))
-    .map(post => ({ ...post, comments: post.comments.filter(commentFilter) }))
-    .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase()))) // can this be moved up a line?
-    .forEach(data.setPost)
-
-  ;(await asyncMap(subreddits, api.getSubredditPosts))
+  ;(await asyncMap([subreddit], api.getSubredditPosts))
     .flat()
     .map(post => ({ ...post, comments: post.comments.filter(commentFilter) }))
     .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
