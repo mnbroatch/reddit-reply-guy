@@ -77,6 +77,7 @@ const subredditsThatDisallowBots = [
 const whitelistedTitles = [
   'Game Winning Goal Challenge',
   'loser leaves reddit',
+  'favorite',
 ]
 
 const DRY_RUN = false
