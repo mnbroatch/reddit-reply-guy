@@ -8,8 +8,7 @@ async function search () {
   const api = await getApi()
   const savestate = await api.getSavestate()
   try {
-    const remainder = await run(savestate)
-    savestate.plagiarismCases = remainder.plagiarismCases
+    savestate.initialPlagiarismCases = await run(savestate)
     savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
     await api.writeSavestate(savestate)
     await api.backupDb()

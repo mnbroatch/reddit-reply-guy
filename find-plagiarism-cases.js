@@ -7,6 +7,8 @@ const commentPairFilter = require('./comment-pair-filter')
 const groupCommentsBySimilarBody = require('./group-comments-by-similar-body')
 
 module.exports = function findPlagiarismCases (posts) {
+  console.log(`about to look for plagiarism cases in ${posts.length} posts`)
+  
   const commentsPerPostWithDupes = Object.values(
     groupBy(
       posts,
@@ -49,6 +51,7 @@ module.exports = function findPlagiarismCases (posts) {
       .filter(similarComments => similarComments.length > 1)
     ).flat().flat()
 
+  console.log('123123', 123123)
   return maybePlagiarismCases
     .filter(plagiarismCase => !repetitiveComments.some(c => c.id.includes(plagiarismCase.copy.id)))
 }

@@ -21,7 +21,8 @@ const {
 const {
   MIN_PLAGIARIST_CASES_FOR_REPORT,
   MAX_COMMENT_AGE,
-  MAX_REMAINDER_AUTHORS,
+  MAX_REMAINDER,
+  MAX_AUTHORS_TO_SEARCH,
 } = require('./constants')
 
 const subsThatDemandOneReportPerAuthor = [
@@ -85,11 +86,15 @@ async function run ({
   subreddit,
   initialPlagiarismCases = []
 }) {
+  try {
   const api = await getApi()
   const data = new Data()
 
-  console.log('initialPlagiarismCases', initialPlagiarismCases)
-  const authors = initialPlagiarismCases.map(plagiarismCase => plagiarismCase.author)
+  const authorsToSearch = await getAuthorsToSearch(initialPlagiarismCases, api)
+
+  console.log('initialPlagiarismCases.length', initialPlagiarismCases.length)
+  console.log(`searching authors: ${authorsToSearch.join(', ')}`)
+  console.log(`searching subreddit: ${subreddit}`)
 
   ;(await asyncMap([subreddit], api.getSubredditPosts))
     .flat()
@@ -97,7 +102,7 @@ async function run ({
     .filter(post => !whitelistedTitles.some(title => post.title.toLowerCase().includes(title.toLowerCase())))
     .forEach(data.setPost)
 
-  const commentsPerAuthor = (await asyncMap(uniqBy(authors), api.getAuthorComments))
+  const commentsPerAuthor = (await asyncMap(uniqBy(authorsToSearch), api.getAuthorComments))
     .map(authorComments => authorComments.filter(commentFilter))
     .filter((authorComments) => {
       authorComments.sort((a, b) => b.created - a.created)
@@ -148,11 +153,14 @@ async function run ({
     }
   )
 
+
+    console.log('1111', 1111)
   const plagiarismCases = await asyncFilter(uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
+  console.log('plagiarismCases.length', plagiarismCases.length)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
   const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)
-    
+
   if (!DRY_RUN) {
     await asyncMap(
       plagiarismCasesPerAuthor.filter(authorPlagiarismCasesFilter),
@@ -189,13 +197,13 @@ async function run ({
           && authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_REPORT
           && !await api.hasAuthorBeenReported(comment.author.name)
         ) {
-          await api.reportAuthor(comment.author.name, `http://reddit.com/comments/${comment.link_id}/-|:]/${reply.id}`)
+          await api.reportAuthor(comment.author.name, `http://reddit.com/comments/${comment.link_id}/${reply.id}`)
         }
       }
     )
 
     await asyncMap(
-      authors,
+      authorsToSearch,
       author => api.setAuthorLastSearched(
         author,
         plagiarismCasesByAuthor[author]?.length
@@ -203,8 +211,22 @@ async function run ({
     )
   }
 
-  console.log('plagiarismCasesPerAuthor', plagiarismCasesPerAuthor)
+  // if author is in authorsToSearch array, we just investigated them.
+  return plagiarismCasesPerAuthor.filter(authorPlagiarismCases => !authorsToSearch.includes(authorPlagiarismCases[0].author)).flat()
+    .slice(0, MAX_REMAINDER)
+  } catch (e) {
+    console.log('e', e)
+  }
+}
 
+function shouldReply (plagiarismCase) {
+  return !subredditsThatDisallowBots.some(
+    subreddit => subreddit.toLowerCase() === plagiarismCase.copy.subreddit.display_name.toLowerCase()
+  )
+}
+
+async function getAuthorsToSearch (plagiarismCases, api) {
+  const plagiarismCasesPerAuthor = Object.values(groupBy(plagiarismCases, 'author'))
   const remainderAuthorsLastSearched = await asyncMap(
     plagiarismCasesPerAuthor,
     async authorPlagiarismCases => ({
@@ -215,7 +237,7 @@ async function run ({
     })
   )
 
-  const authorsToReturn = uniqBy(
+  return uniqBy(
     remainderAuthorsLastSearched
       .sort((a, b) => 
         (a.lastSearched || 0) - (b.lastSearched || 0)
@@ -223,21 +245,7 @@ async function run ({
           || b.latestCommentCreated - a.latestCommentCreated
       )
       .map(plagiarismCase => plagiarismCase.author)
-  ).slice(0, MAX_REMAINDER_AUTHORS)
-
-
-  const plagiarismCasesToReturn = authorsToReturn.map(author => plagiarismCasesByAuthor[author]).flat()
-
-  return {
-    plagiarismCases: plagiarismCasesToReturn,
-    authors: authorsToReturn,
-  }
-}
-
-function shouldReply (plagiarismCase) {
-  return !subredditsThatDisallowBots.some(
-    subreddit => subreddit.toLowerCase() === plagiarismCase.copy.subreddit.display_name.toLowerCase()
-  )
+  ).slice(0, MAX_AUTHORS_TO_SEARCH)
 }
 
 module.exports = run

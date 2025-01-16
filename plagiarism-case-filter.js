@@ -7,17 +7,17 @@ const criteria = [
     description: 'Is comment not too old?',
     test: ({ copy }) => copy.created * 1000 > Date.now() - MAX_COMMENT_AGE
   },
-  {
-    description: 'Is the comment not already reported?',
-    test: async ({ copy }) => {
-      const api = await getApi()
-      if (await api.hasCommentBeenReported(copy)) {
-        return false
-      } else {
-        return true
-      }
-    }
-  },
+  // {
+  //   description: 'Is the comment not already reported?',
+  //   test: async ({ copy }) => {
+  //     const api = await getApi()
+  //     if (await api.hasCommentBeenReported(copy)) {
+  //       return false
+  //     } else {
+  //       return true
+  //     }
+  //   }
+  // },
 ]
 
 module.exports = function (plagiarismCase) {
