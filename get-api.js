@@ -283,12 +283,11 @@ class Api {
     return this.authorsDb.get(author)?.reportedInSubs || []
   }
 
-  setAuthorLastSearched (author, plagiarismCaseCount) {
+  setAuthorLastSearched (author) {
     const authorData = this.authorsDb.get(author) || {}
     return this.authorsDb.set(author, {
       ...authorData,
       lastSearched: Date.now(),
-      plagiarismCaseCount,
     })
   }
 
@@ -322,9 +321,7 @@ class Api {
       }
     } catch (e) {
       return {
-        subreddit: subreddits[0],
-        authors: [],
-        plagiarismCases: [],
+        initialPlagiarismCases: [],
       }
     }
   }

@@ -200,10 +200,7 @@ async function run ({
 
     await asyncMap(
       authorsToSearch,
-      author => api.setAuthorLastSearched(
-        author,
-        plagiarismCasesByAuthor[author]?.length
-      )
+      author => api.setAuthorLastSearched(author)
     )
   }
   // if author is in authorsToSearch array, we just investigated them.
