@@ -11,7 +11,6 @@ const {
   createReplyText,
   createReportText,
   createModmailText,
-  createTable
 } = require('./create-summary-text')
 const {
   asyncMap,
@@ -86,7 +85,6 @@ async function run ({
   subreddit,
   initialPlagiarismCases = []
 }) {
-  try {
   const api = await getApi()
   const data = new Data()
 
@@ -154,9 +152,7 @@ async function run ({
   )
 
 
-    console.log('1111', 1111)
   const plagiarismCases = await asyncFilter(uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
-  console.log('plagiarismCases.length', plagiarismCases.length)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
   const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)
@@ -210,13 +206,13 @@ async function run ({
       )
     )
   }
-
   // if author is in authorsToSearch array, we just investigated them.
-  return plagiarismCasesPerAuthor.filter(authorPlagiarismCases => !authorsToSearch.includes(authorPlagiarismCases[0].author)).flat()
+  const unsearchedPlagiarismCasesPerAuthor = plagiarismCasesPerAuthor
+    .filter(authorPlagiarismCases => !authorsToSearch.includes(authorPlagiarismCases[0].author))
+
+  return (await sortAuthorPlagiarismCases(unsearchedPlagiarismCasesPerAuthor, api))
+    .flat()
     .slice(0, MAX_REMAINDER)
-  } catch (e) {
-    console.log('e', e)
-  }
 }
 
 function shouldReply (plagiarismCase) {
@@ -227,7 +223,13 @@ function shouldReply (plagiarismCase) {
 
 async function getAuthorsToSearch (plagiarismCases, api) {
   const plagiarismCasesPerAuthor = Object.values(groupBy(plagiarismCases, 'author'))
-  const remainderAuthorsLastSearched = await asyncMap(
+  return (await sortAuthorPlagiarismCases(plagiarismCasesPerAuthor, api))
+    .map(authorPlagiarismCases => authorPlagiarismCases[0].author)
+    .slice(0, MAX_AUTHORS_TO_SEARCH)
+}
+
+async function sortAuthorPlagiarismCases (plagiarismCasesPerAuthor, api) {
+  const authorsMetadata = await asyncMap(
     plagiarismCasesPerAuthor,
     async authorPlagiarismCases => ({
       author: authorPlagiarismCases[0].author,
@@ -237,15 +239,18 @@ async function getAuthorsToSearch (plagiarismCases, api) {
     })
   )
 
-  return uniqBy(
-    remainderAuthorsLastSearched
+  const sortedAuthorsMetadata = uniqBy(
+    authorsMetadata
       .sort((a, b) => 
         (a.lastSearched || 0) - (b.lastSearched || 0)
           || b.plagiarismCasesCount - a.plagiarismCasesCount
           || b.latestCommentCreated - a.latestCommentCreated
       )
-      .map(plagiarismCase => plagiarismCase.author)
-  ).slice(0, MAX_AUTHORS_TO_SEARCH)
+  )
+
+  return plagiarismCasesPerAuthor.sort((a, b) => {
+    return sortedAuthorsMetadata.findIndex(m => m.author === a[0].author) - sortedAuthorsMetadata.findIndex(m => m.author === b[0].author)
+  })
 }
 
 module.exports = run
