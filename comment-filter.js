@@ -67,6 +67,9 @@ const subredditWhitelist = [
   'LoserleavesReddit',
   'ApsaraBazaar',
   'RandomActsofCards',
+  'CelebAssPussyMouth2',
+  'PornstarVSPornstar',
+  'ChooseAPornstar',
 ]
 
 const criteria = [

@@ -24,7 +24,7 @@ module.exports = class Data {
     return this.posts[id]
   }
 
-  getAllPosts(id) {
+  getAllPosts() {
     return Object.values(this.posts)
   }
 }

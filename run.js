@@ -85,12 +85,15 @@ async function run ({
   subreddit,
   initialPlagiarismCases = []
 }) {
+  // this filtering is for clearing some cases if the rules change
+  const filteredInitialPlagiarismCases = initialPlagiarismCases
+    .filter(plagiarismCase => commentFilter(plagiarismCase.copy))
   const api = await getApi()
   const data = new Data()
 
-  const authorsToSearch = await getAuthorsToSearch(initialPlagiarismCases, api)
+  const authorsToSearch = await getAuthorsToSearch(filteredInitialPlagiarismCases, api)
 
-  console.log('initialPlagiarismCases.length', initialPlagiarismCases.length)
+  console.log('filteredInitialPlagiarismCases.length', filteredInitialPlagiarismCases.length)
   console.log(`searching authors: ${authorsToSearch.join(', ')}`)
   console.log(`searching subreddit: ${subreddit}`)
 
@@ -151,8 +154,7 @@ async function run ({
     }
   )
 
-
-  const plagiarismCases = await asyncFilter(uniqBy([ ...initialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
+  const plagiarismCases = await asyncFilter(uniqBy([ ...filteredInitialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
   const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)

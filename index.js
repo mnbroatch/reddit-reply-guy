@@ -19,7 +19,9 @@ async function search () {
 }
 
 ;(async function () {
+  console.log('================================')
   while (true) {
+    console.log('--------------------------------')
     console.log('time: ', (new Date()).toLocaleTimeString())
     const start = Date.now()
     await search()
