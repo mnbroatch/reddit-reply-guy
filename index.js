@@ -1,6 +1,7 @@
 const getCache = require('./get-cache')
 const run = require('./run')
 const getApi = require('./get-api')
+const getCredits = require('./get-credits')
 const subreddits = require('./subreddits')
 
 async function search () {
@@ -19,13 +20,26 @@ async function search () {
 }
 
 ;(async function () {
-  console.log('================================')
+  console.log('=====================================')
   while (true) {
-    console.log('--------------------------------')
+    if (!process.env.IS_LOCAL) {
+      let credits = await getCredits()
+      if (credits < 10) {
+        console.log('credits low, rebuilding')
+        while (credits < 30) {
+          await sleep(1000 * 60)
+          credits = await getCredits()
+        }
+      }
+    }
     console.log('time: ', (new Date()).toLocaleTimeString())
     const start = Date.now()
     await search()
     console.log(`search took ${Date.now() - start}ms`)
+    console.log('--------------------------------')
   }
 })()
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}

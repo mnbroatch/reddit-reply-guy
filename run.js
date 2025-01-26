@@ -22,6 +22,7 @@ const {
   MAX_COMMENT_AGE,
   MAX_REMAINDER,
   MAX_AUTHORS_TO_SEARCH,
+  MIN_PLAGIARIST_CASES_FOR_COMMENT,
 } = require('./constants')
 
 const subsThatDemandOneReportPerAuthor = [
@@ -79,7 +80,7 @@ const whitelistedTitles = [
   'favorite',
 ]
 
-const DRY_RUN = true
+const DRY_RUN = false
 
 async function run ({
   subreddit,
@@ -157,11 +158,11 @@ async function run ({
   const plagiarismCases = await asyncFilter(uniqBy([ ...filteredInitialPlagiarismCases, ...findPlagiarismCases(data.getAllPosts()) ], 'copy.id'), plagiarismCaseFilter)
 
   const plagiarismCasesByAuthor = groupBy(plagiarismCases, 'author')
-  const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor)
+  const plagiarismCasesPerAuthor = Object.values(plagiarismCasesByAuthor).filter(authorPlagiarismCasesFilter)
 
   if (!DRY_RUN) {
     await asyncMap(
-      plagiarismCasesPerAuthor.filter(authorPlagiarismCasesFilter),
+      plagiarismCasesPerAuthor.filter(authorPlagiarismCases => authorPlagiarismCases.length > MIN_PLAGIARIST_CASES_FOR_COMMENT),
       async (authorPlagiarismCases) => {
         let reply // will be overwritten each case, but we only need one per author
         let comment

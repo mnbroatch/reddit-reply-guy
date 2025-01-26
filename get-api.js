@@ -3,6 +3,7 @@ const {
   PutObjectCommand,
 } = require("@aws-sdk/client-s3");
 const fs = require('fs')
+const path = require('path')
 const getEnv = require('./get-env')
 const s3Client = require('./s3-client')
 const axios = require('axios')
@@ -59,7 +60,7 @@ class Api {
             Key: 'authors',
           }),
         );
-        fs.writeFileSync( './db/authors.json', await authorsDbResponse.Body.transformToString())
+        fs.writeFileSync(path.join(__dirname, 'db/authors.json'), await authorsDbResponse.Body.transformToString())
       } catch (e) {
       }
 
@@ -70,13 +71,13 @@ class Api {
             Key: 'comments',
           }),
         );
-        fs.writeFileSync( './db/comments.json', await commentsDbResponse.Body.transformToString())
+        fs.writeFileSync(path.join(__dirname, 'db/comments.json'), await commentsDbResponse.Body.transformToString())
       } catch (e) {
       }
     }
 
-    this.authorsDb = new JSONdb('db/authors.json')
-    this.commentsDb = new JSONdb('db/comments.json')
+    this.authorsDb = new JSONdb(path.join(__dirname, 'db/authors.json'))
+    this.commentsDb = new JSONdb(path.join(__dirname, 'db/comments.json'))
   }
 
   async getComment (id) {

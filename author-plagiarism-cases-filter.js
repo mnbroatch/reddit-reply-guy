@@ -8,6 +8,5 @@ module.exports = function authorPlagiarismCasesFilter  (authorPlagiarismCases) {
     console.log('authorPlagiarismCases[0].author', authorPlagiarismCases[0].author)
   }
 
-  return !isOnlyRepetitiveInOneSub
-    && authorPlagiarismCases.length >= MIN_PLAGIARIST_CASES_FOR_COMMENT
+  return !isOnlyRepetitiveInOneSub || authorPlagiarismCases.length < MIN_PLAGIARIST_CASES_FOR_COMMENT
 }
