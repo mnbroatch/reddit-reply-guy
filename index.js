@@ -3,6 +3,7 @@ const run = require('./run')
 const getApi = require('./get-api')
 const getCredits = require('./get-credits')
 const subreddits = require('./subreddits')
+const { exec } = require('child_process');
 
 async function search () {
   const cache = await getCache()
@@ -23,13 +24,10 @@ async function search () {
   console.log('=====================================')
   while (true) {
     if (!process.env.IS_LOCAL) {
-      let credits = await getCredits()
-      if (credits < 10) {
-        console.log('credits low, rebuilding')
-        while (credits < 30) {
-          await sleep(1000 * 60)
-          credits = await getCredits()
-        }
+      const credits = await getCredits()
+      if (credits < 1) {
+        exec('sudo shutdown now -h')
+        return
       }
     }
     console.log('time: ', (new Date()).toLocaleTimeString())
@@ -39,7 +37,3 @@ async function search () {
     console.log('--------------------------------')
   }
 })()
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
