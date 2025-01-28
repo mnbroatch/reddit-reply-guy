@@ -235,6 +235,7 @@ async function sortAuthorPlagiarismCases (plagiarismCasesPerAuthor, api) {
       author: authorPlagiarismCases[0].author,
       lastSearched: await api.getAuthorLastSearched(authorPlagiarismCases[0].author),
       latestCommentCreated: authorPlagiarismCases.sort((a, b) => b.copy.created - a.copy.created)[0].copy.created,
+      longestCommentLength: authorPlagiarismCases.reduce((acc, plagiarismCase) => Math.max(acc, plagiarismCase.copy.body.length), 0),
       plagiarismCasesCount: authorPlagiarismCases.length
     })
   )
@@ -244,6 +245,7 @@ async function sortAuthorPlagiarismCases (plagiarismCasesPerAuthor, api) {
       .sort((a, b) => 
         (a.lastSearched || 0) - (b.lastSearched || 0)
           || b.plagiarismCasesCount - a.plagiarismCasesCount
+          || b.longestCommentLength - a.longestCommentLength
           || b.latestCommentCreated - a.latestCommentCreated
       )
   )
