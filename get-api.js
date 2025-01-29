@@ -80,23 +80,6 @@ class Api {
     this.commentsDb = new JSONdb(path.join(__dirname, 'db/comments.json'))
   }
 
-  async getComment (id) {
-    const comment = this.snoowrap.getComment(id)
-
-    return {
-      id: await comment.id,
-      name: await comment.name,
-      body: await comment.body,
-      created: await comment.created,
-      author: await comment.author,
-      permalink: await comment.permalink,
-      link_id: (await comment.link_id).replace(/^t3_/, ''),
-      parent_id: (await comment.parent_id).replace(/^t3_/, ''),
-      subreddit: await comment.subreddit,
-      replyAuthors: [ ...(await comment.replies).map(({ author }) => ({ author: author.name })) ],
-    }
-  }
-
   async getPost (postId) {
     try {
       const post = await this.snoowrap.getSubmission(postId)
