@@ -15,7 +15,7 @@ const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
 const subreddits = require('./subreddits')
-const {INITIAL_POST_LIMIT, AUTHOR_POST_LIMIT} = require('./constants')
+const {INITIAL_POST_LIMIT, AUTHOR_POST_LIMIT, REQUEST_DELAY} = require('./constants')
 
 
 
@@ -39,8 +39,8 @@ class Api {
     this.snoowrap = new Snoowrap(snoowrapOptions)
     this.snoowrap.config({
       continueAfterRatelimitError: true,
-      requestDelay: 1000,
-      // debug: true,
+      requestDelay: REQUEST_DELAY,
+      debug: true,
     })
 
     this.cache = await getCache()
@@ -290,7 +290,7 @@ class Api {
   async getSavestate () {
     try {
       if (process.env.IS_LOCAL) {
-          return JSON.parse(fs.readFileSync('./db/savestate.json'))
+          return JSON.parse(fs.readFileSync(path.join(__dirname, 'db/savestate.json'), JSON.stringify(savestate)))
           // savestate.authors = savestate.authors
           //   .concat([ // sneak in more authors here on startup
           //  ])
@@ -312,7 +312,7 @@ class Api {
 
   writeSavestate (savestate) {
     if (process.env.IS_LOCAL) {
-      fs.writeFileSync( './db/savestate.json', JSON.stringify(savestate))
+      fs.writeFileSync(path.join(__dirname, 'db/savestate.json'), JSON.stringify(savestate))
     } else {
       const command = new PutObjectCommand({
         Bucket: 'redditreplyguy',
@@ -327,25 +327,27 @@ class Api {
   async backupDb (savestate) {
     if (!process.env.IS_LOCAL) {
       try {
-        const authorsDbString = fs.readFileSync('./db/authors.json')
+        const authorsDbString = fs.readFileSync(path.join(__dirname, 'db/authors.json'))
         const authorsDbCommand = new PutObjectCommand({
           Bucket: 'redditreplyguy',
           Key: 'authors',
           Body: authorsDbString,
         });
         await s3Client.send(authorsDbCommand);
-      } catch {
+      } catch (e) {
+      	console.error(e)
       }
 
       try {
-        const commentsDbString = fs.readFileSync('./db/comments.json')
+        const commentsDbString = fs.readFileSync(path.join(__dirname, 'db/comments.json'))
         const commentsDbCommand = new PutObjectCommand({
           Bucket: 'redditreplyguy',
           Key: 'comments',
           Body: commentsDbString,
         });
         await s3Client.send(commentsDbCommand);
-      } catch {
+      } catch (e) {
+      	console.error(e)
       }
     }
   }
