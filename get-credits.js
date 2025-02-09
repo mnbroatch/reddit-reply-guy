@@ -42,7 +42,8 @@ const getCPUCreditBalance = async (instanceId) => {
 
 // Main function to fetch instances and their CPU credit balance
 const main = async () => {
-  const instance = (await getEC2Instances())[0];
+  const instance = (await getEC2Instances())
+    .filter((instance) => instance.State.Name === 'running')[0];
   return getCPUCreditBalance(instance.InstanceId);
 };
 
