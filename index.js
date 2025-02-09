@@ -1,5 +1,6 @@
 const getCache = require('./get-cache')
 const run = require('./run')
+const { MIN_CREDITS, MIN_CREDITS_FOR_START } = require('./constants')
 const getApi = require('./get-api')
 const getCredits = require('./get-credits')
 const subreddits = require('./subreddits')
@@ -10,6 +11,9 @@ async function search () {
   const api = await getApi()
   const savestate = await api.getSavestate()
   try {
+    if (!savestate.subreddit) {
+      savestate.subreddit = subreddits[0]
+    }
     savestate.initialPlagiarismCases = await run(savestate)
     savestate.subreddit = subreddits[(subreddits.indexOf(savestate.subreddit) + 1) % subreddits.length]
     await api.writeSavestate(savestate)
@@ -22,10 +26,21 @@ async function search () {
 
 ;(async function () {
   console.log('=====================================')
+  let credits
+  if (!process.env.IS_LOCAL) {
+    credits = await getCredits()
+    // This means we started but amazon didn't give us our creds
+    while (credits < MIN_CREDITS_FOR_START) {
+      console.log('low credits at startup, waiting: ', credits)
+      await sleep(1000 * 60)
+      credits = await getCredits()
+    }
+  }
   while (true) {
     if (!process.env.IS_LOCAL) {
-      const credits = await getCredits()
-      if (credits < 1) {
+      credits = await getCredits()
+      if (credits < MIN_CREDITS) {
+        console.log('low credits, shutting down:', credits)
         exec('sudo shutdown now -h')
         return
       }
@@ -37,3 +52,7 @@ async function search () {
     console.log('--------------------------------')
   }
 })()
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
