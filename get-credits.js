@@ -1,50 +1,63 @@
-const { EC2Client, DescribeInstancesCommand } = require( "@aws-sdk/client-ec2");
-const { CloudWatchClient, GetMetricStatisticsCommand } = require( "@aws-sdk/client-cloudwatch");
+const { EC2Client, DescribeInstanceCreditSpecificationsCommand } = require('@aws-sdk/client-ec2');
+const { CloudWatchClient, GetMetricStatisticsCommand } = require('@aws-sdk/client-cloudwatch');
+const axios = require('axios');
 
-// Create EC2 and CloudWatch clients
-const ec2Client = new EC2Client({ region: "us-east-1" }); // replace with your region
-const cloudWatchClient = new CloudWatchClient({ region: "us-east-1" });
-
-// Function to describe EC2 instances
-const getEC2Instances = async () => {
+// Function to get the instance ID of the EC2 instance (with IMDSv2 support)
+async function getInstanceId() {
   try {
-    const data = await ec2Client.send(new DescribeInstancesCommand({}));
-    return data.Reservations?.flatMap(reservation => reservation.Instances) || [];
-  } catch (error) {
-    console.error("Error fetching EC2 instances:", error);
-  }
-};
+    const tokenResponse = await axios.put('http://169.254.169.254/latest/api/token', null, {
+      headers: { 'X-aws-ec2-metadata-token-ttl-seconds': '21600' }, // Token TTL of 6 hours
+    });
 
-// Function to get CPU credit balance for a given instance
-const getCPUCreditBalance = async (instanceId) => {
+    const token = tokenResponse.data;
+
+    const instanceIdResponse = await axios.get('http://169.254.169.254/latest/meta-data/instance-id', {
+      headers: { 'X-aws-ec2-metadata-token': token },
+    });
+
+    return instanceIdResponse.data;
+  } catch (error) {
+    throw new Error('Error fetching instance metadata: ' + error.message);
+  }
+}
+
+// Function to get the current CPU credit balance from CloudWatch
+async function getCpuCreditBalance() {
+  const instanceId = await getInstanceId(); // Get the current EC2 instance ID
+
+  // Set up CloudWatch client
+  const cloudWatchClient = new CloudWatchClient({ region: 'us-east-1' }); // Specify the appropriate region
+
   const params = {
-    MetricName: "CPUCreditBalance", // The metric to check
-    Namespace: "AWS/EC2",
+    MetricName: 'CPUCreditBalance',
+    Namespace: 'AWS/EC2',
     Dimensions: [
       {
-        Name: "InstanceId",
+        Name: 'InstanceId',
         Value: instanceId,
       },
     ],
-    StartTime: new Date(new Date().getTime() - 3600 * 1000), // 1 hour ago
+    StartTime: new Date(new Date().getTime() - 1000 * 60 * 30),
     EndTime: new Date(),
-    Period: 60, // 1-minute granularity
-    Statistics: ["Average"],
+    Period: 60,
+    Statistics: ['Average'],
   };
 
+  const command = new GetMetricStatisticsCommand(params);
+
   try {
-    const data = await cloudWatchClient.send(new GetMetricStatisticsCommand(params));
-    return data.Datapoints[data.Datapoints.length - 1].Average;
+    const data = await cloudWatchClient.send(command);
+
+    if (data.Datapoints.length > 0) {
+      const latestDatapoint = data.Datapoints[data.Datapoints.length - 1];
+      return latestDatapoint.Average
+    } else {
+      console.log('No data points available for CPU Credit Balance.');
+      return 0
+    }
   } catch (error) {
-    console.error("Error fetching CloudWatch metrics:", error);
+    console.error('Error retrieving CPU credit balance from CloudWatch:', error);
   }
-};
+}
 
-// Main function to fetch instances and their CPU credit balance
-const main = async () => {
-  const instance = (await getEC2Instances())
-    .filter((instance) => instance.State.Name === 'running')[0];
-  return getCPUCreditBalance(instance.InstanceId);
-};
-
-module.exports = main
+module.exports = getCpuCreditBalance
