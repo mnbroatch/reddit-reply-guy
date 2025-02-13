@@ -39,6 +39,7 @@ async function search () {
   while (true) {
     if (!process.env.IS_LOCAL) {
       credits = await getCredits()
+	console.log('memory: ', process.memoryUsage())
       if (credits < MIN_CREDITS) {
         console.log('low credits, shutting down:', credits)
         exec('sudo shutdown now -h')
