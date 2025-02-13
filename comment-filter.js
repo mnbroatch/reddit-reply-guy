@@ -77,6 +77,10 @@ const subredditWhitelist = [
   'ChooseAPornstar',
 ]
 
+const bodyWhitelist = [
+  'sorry for your loss',
+]
+
 const criteria = [
   {
     description: 'Is subreddit not the author\'s personal subreddit?',
@@ -91,6 +95,13 @@ const criteria = [
   {
     description: 'Is author not whitelisted?',
     test: (comment) => !authorWhitelist.includes(comment.author.name),
+  },
+  {
+    description: 'Is body not primarily a whitelisted phrase?',
+    test: (comment) => {
+      const matchingPhrase = bodyWhitelist.find(phrase => comment.body.toLowerCase().includes(phrase))
+      return !matchingPhrase || comment.body.length > matchingPhrase.length * 2
+    }
   },
   {
     description: 'Is body not a gif?',

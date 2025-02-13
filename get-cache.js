@@ -6,11 +6,12 @@ const pickBy = require('lodash/pickBy')
 const crypto = require('crypto')
 const NodeCache = require('node-cache')
 const s3Client = require('./s3-client')
+const { CACHE_TTL } = require('./constants')
 
 class Cache {
   constructor() {
     this._cache = new NodeCache({
-      stdTTL: 60 * 60,
+      stdTTL: CACHE_TTL,
       useClones: false
     })
 
