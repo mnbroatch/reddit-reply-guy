@@ -290,7 +290,7 @@ class Api {
   async getSavestate () {
     try {
       if (process.env.IS_LOCAL) {
-          return JSON.parse(fs.readFileSync(path.join(__dirname, 'db/savestate.json'), JSON.stringify(savestate)))
+          return JSON.parse(fs.readFileSync(path.join(__dirname, 'db/savestate.json')))
           // savestate.authors = savestate.authors
           //   .concat([ // sneak in more authors here on startup
           //  ])
