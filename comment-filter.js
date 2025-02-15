@@ -75,10 +75,18 @@ const subredditWhitelist = [
   'CelebAssPussyMouth2',
   'PornstarVSPornstar',
   'ChooseAPornstar',
+  'boopthesnoot',
 ]
 
 const bodyWhitelist = [
   'sorry for your loss',
+  'hahahahahahaha',
+  'shut the fuck up donny',
+  'shut the fuck up, donny',
+  'why were they filming',
+  'insists upon itself',
+  'thank you for rescuing',
+  'came here to say this',
 ]
 
 const criteria = [
@@ -120,6 +128,7 @@ const criteria = [
     description: 'Is comment actually there?',
     test: (comment) => 
       comment.body !== '[removed]'
+      && comment.body !== '[ Removed by Reddit ]'
       && comment.body !== '[deleted]'
   },
   {
