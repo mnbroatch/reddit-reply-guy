@@ -304,6 +304,7 @@ class Api {
         return JSON.parse(await response.Body.transformToString());
       }
     } catch (e) {
+      console.error(e)
       return {
         initialPlagiarismCases: [],
       }
