@@ -78,6 +78,9 @@ const whitelistedTitles = [
   'Game Winning Goal Challenge',
   'loser leaves reddit',
   'favorite',
+  'compatibility',
+  'ranking',
+  'autocomplete',
 ]
 
 const DRY_RUN = false

@@ -1,5 +1,5 @@
 const stripQuotes = require('./strip-quotes')
-const {MIN_COMMENT_LENGTH} = require('./constants')
+const { MIN_COMMENT_LENGTH } = require('./constants')
 
 const authorWhitelist = [
   'worldmobilemod',
@@ -76,9 +76,14 @@ const subredditWhitelist = [
   'PornstarVSPornstar',
   'ChooseAPornstar',
   'boopthesnoot',
+  'lastfm',
+  'c4ctiktok',
+  'buildit',
 ]
 
 const bodyWhitelist = [
+  'did i hear a rock and stone',
+  'rock and stone',
   'sorry for your loss',
   'hahahahahahaha',
   'shut the fuck up donny',
