@@ -3,6 +3,7 @@ const {
   PutObjectCommand,
 } = require("@aws-sdk/client-s3");
 const fs = require('fs')
+const path = require('path')
 const getEnv = require('./get-env')
 const s3Client = require('./s3-client')
 const axios = require('axios')
@@ -14,7 +15,7 @@ const Post = require('./post')
 const stripComment = require('./strip-comment')
 const { asyncMap } = require('./async-array-helpers')
 const subreddits = require('./subreddits')
-const {INITIAL_POST_LIMIT, AUTHOR_POST_LIMIT} = require('./constants')
+const {INITIAL_POST_LIMIT, AUTHOR_POST_LIMIT, REQUEST_DELAY} = require('./constants')
 
 
 
@@ -38,8 +39,8 @@ class Api {
     this.snoowrap = new Snoowrap(snoowrapOptions)
     this.snoowrap.config({
       continueAfterRatelimitError: true,
-      requestDelay: 1000,
-      // debug: true,
+      requestDelay: REQUEST_DELAY,
+      debug: true,
     })
 
     this.cache = await getCache()
@@ -59,7 +60,7 @@ class Api {
             Key: 'authors',
           }),
         );
-        fs.writeFileSync( './db/authors.json', await authorsDbResponse.Body.transformToString())
+        fs.writeFileSync(path.join(__dirname, 'db/authors.json'), await authorsDbResponse.Body.transformToString())
       } catch (e) {
       }
 
@@ -70,30 +71,13 @@ class Api {
             Key: 'comments',
           }),
         );
-        fs.writeFileSync( './db/comments.json', await commentsDbResponse.Body.transformToString())
+        fs.writeFileSync(path.join(__dirname, 'db/comments.json'), await commentsDbResponse.Body.transformToString())
       } catch (e) {
       }
     }
 
-    this.authorsDb = new JSONdb('db/authors.json')
-    this.commentsDb = new JSONdb('db/comments.json')
-  }
-
-  async getComment (id) {
-    const comment = this.snoowrap.getComment(id)
-
-    return {
-      id: await comment.id,
-      name: await comment.name,
-      body: await comment.body,
-      created: await comment.created,
-      author: await comment.author,
-      permalink: await comment.permalink,
-      link_id: (await comment.link_id).replace(/^t3_/, ''),
-      parent_id: (await comment.parent_id).replace(/^t3_/, ''),
-      subreddit: await comment.subreddit,
-      replyAuthors: [ ...(await comment.replies).map(({ author }) => ({ author: author.name })) ],
-    }
+    this.authorsDb = new JSONdb(path.join(__dirname, 'db/authors.json'))
+    this.commentsDb = new JSONdb(path.join(__dirname, 'db/comments.json'))
   }
 
   async getPost (postId) {
@@ -283,12 +267,11 @@ class Api {
     return this.authorsDb.get(author)?.reportedInSubs || []
   }
 
-  setAuthorLastSearched (author, plagiarismCaseCount) {
+  setAuthorLastSearched (author) {
     const authorData = this.authorsDb.get(author) || {}
     return this.authorsDb.set(author, {
       ...authorData,
       lastSearched: Date.now(),
-      plagiarismCaseCount,
     })
   }
 
@@ -307,7 +290,7 @@ class Api {
   async getSavestate () {
     try {
       if (process.env.IS_LOCAL) {
-          return JSON.parse(fs.readFileSync('./db/savestate.json'))
+          return JSON.parse(fs.readFileSync(path.join(__dirname, 'db/savestate.json')))
           // savestate.authors = savestate.authors
           //   .concat([ // sneak in more authors here on startup
           //  ])
@@ -321,17 +304,16 @@ class Api {
         return JSON.parse(await response.Body.transformToString());
       }
     } catch (e) {
+      console.error(e)
       return {
-        subreddit: subreddits[0],
-        authors: [],
-        plagiarismCases: [],
+        initialPlagiarismCases: [],
       }
     }
   }
 
   writeSavestate (savestate) {
     if (process.env.IS_LOCAL) {
-      fs.writeFileSync( './db/savestate.json', JSON.stringify(savestate))
+      fs.writeFileSync(path.join(__dirname, 'db/savestate.json'), JSON.stringify(savestate))
     } else {
       const command = new PutObjectCommand({
         Bucket: 'redditreplyguy',
@@ -346,25 +328,27 @@ class Api {
   async backupDb (savestate) {
     if (!process.env.IS_LOCAL) {
       try {
-        const authorsDbString = fs.readFileSync('./db/authors.json')
+        const authorsDbString = fs.readFileSync(path.join(__dirname, 'db/authors.json'))
         const authorsDbCommand = new PutObjectCommand({
           Bucket: 'redditreplyguy',
           Key: 'authors',
           Body: authorsDbString,
         });
         await s3Client.send(authorsDbCommand);
-      } catch {
+      } catch (e) {
+      	console.error(e)
       }
 
       try {
-        const commentsDbString = fs.readFileSync('./db/comments.json')
+        const commentsDbString = fs.readFileSync(path.join(__dirname, 'db/comments.json'))
         const commentsDbCommand = new PutObjectCommand({
           Bucket: 'redditreplyguy',
           Key: 'comments',
           Body: commentsDbString,
         });
         await s3Client.send(commentsDbCommand);
-      } catch {
+      } catch (e) {
+      	console.error(e)
       }
     }
   }

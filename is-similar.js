@@ -2,7 +2,7 @@ const compareTwoStrings = require('string-similarity').compareTwoStrings
 const stripQuotes = require('./strip-quotes')
 const {SIMILARITY_THRESHOLD} = require('./constants')
 
-module.exports = function isSimilar(str1, str2, threshold = SIMILARITY_THRESHOLD) {
+module.exports = function isSimilar(str1, str2) {
   const str1WithoutQuotes = stripQuotes(str1)
   const str2WithoutQuotes = stripQuotes(str2)
   if (str1WithoutQuotes.length > 5) {
@@ -11,5 +11,5 @@ module.exports = function isSimilar(str1, str2, threshold = SIMILARITY_THRESHOLD
   if (str2WithoutQuotes.length > 5) {
     str2 = str2WithoutQuotes
   }
-  return compareTwoStrings(str1.toLowerCase(), str2.toLowerCase()) > threshold
+  return compareTwoStrings(str1.toLowerCase(), str2.toLowerCase()) > SIMILARITY_THRESHOLD
 }

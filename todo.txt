@@ -1,0 +1,2 @@
+- cache plagiarismCases with post so we don't re-scan posts
+

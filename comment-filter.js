@@ -1,5 +1,5 @@
 const stripQuotes = require('./strip-quotes')
-const {MIN_COMMENT_LENGTH} = require('./constants')
+const { MIN_COMMENT_LENGTH } = require('./constants')
 
 const authorWhitelist = [
   'worldmobilemod',
@@ -20,6 +20,7 @@ const authorWhitelist = [
 const subredditWhitelist = [
   'FlappyGoose',
   'RedditGames',
+  'CircuitsWordGame',
   'NYTStrands',
   'NYTConnections',
   'wordle',
@@ -73,6 +74,26 @@ const subredditWhitelist = [
   'LoserleavesReddit',
   'ApsaraBazaar',
   'RandomActsofCards',
+  'CelebAssPussyMouth2',
+  'PornstarVSPornstar',
+  'ChooseAPornstar',
+  'boopthesnoot',
+  'lastfm',
+  'c4ctiktok',
+  'buildit',
+]
+
+const bodyWhitelist = [
+  'did i hear a rock and stone',
+  'rock and stone',
+  'sorry for your loss',
+  'hahahahahahaha',
+  'shut the fuck up donny',
+  'shut the fuck up, donny',
+  'why were they filming',
+  'insists upon itself',
+  'thank you for rescuing',
+  'came here to say this',
 ]
 
 const criteria = [
@@ -91,6 +112,13 @@ const criteria = [
     test: (comment) => !authorWhitelist.includes(comment.author.name),
   },
   {
+    description: 'Is body not primarily a whitelisted phrase?',
+    test: (comment) => {
+      const matchingPhrase = bodyWhitelist.find(phrase => comment.body.toLowerCase().includes(phrase))
+      return !matchingPhrase || comment.body.length > matchingPhrase.length * 2
+    }
+  },
+  {
     description: 'Is body not a gif?',
     test: (comment) => !(/^!\[gif]\(.*\)$/.test(comment.body)),
   },
@@ -107,6 +135,7 @@ const criteria = [
     description: 'Is comment actually there?',
     test: (comment) => 
       comment.body !== '[removed]'
+      && comment.body !== '[ Removed by Reddit ]'
       && comment.body !== '[deleted]'
   },
   {
