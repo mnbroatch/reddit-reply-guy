@@ -18,6 +18,12 @@ const authorWhitelist = [
 
 // generally subs with a lot of memes or rigid formats
 const subredditWhitelist = [
+  'FlappyGoose',
+  'RedditGames',
+  'NYTStrands',
+  'NYTConnections',
+  'wordle',
+  'u_randomdice_game',
   'suggestmeabook',
   'weirdspotifyplaylists',
   'musicsuggestions',
