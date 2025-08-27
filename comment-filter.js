@@ -1,5 +1,3 @@
-const stripQuotes = require('./strip-quotes')
-const { MIN_COMMENT_LENGTH } = require('./constants')
 
 const authorWhitelist = [
   'worldmobilemod',
@@ -18,6 +16,8 @@ const authorWhitelist = [
 
 // generally subs with a lot of memes or rigid formats
 const subredditWhitelist = [
+  'Autocompletebutbetter',
+  'autocorrect',
   'FlappyGoose',
   'RedditGames',
   'CircuitsWordGame',
