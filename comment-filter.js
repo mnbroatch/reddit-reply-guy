@@ -84,6 +84,7 @@ const subredditWhitelist = [
 ]
 
 const bodyWhitelist = [
+  'release the epstein files',
   'did i hear a rock and stone',
   'rock and stone',
   'sorry for your loss',
